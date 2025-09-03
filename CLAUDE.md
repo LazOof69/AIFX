@@ -31,6 +31,7 @@ This file provides essential guidance to Claude Code (claude.ai/code) when worki
 - **NEVER** copy-paste code blocks → extract into shared utilities/functions | **絕不** 複製貼上代碼區塊 → 提取到共享工具/函數中
 - **NEVER** hardcode values that should be configurable → use config files/environment variables | **絕不** 硬編碼應可配置的值 → 使用配置文件/環境變數
 - **NEVER** use naming like enhanced_, improved_, new_, v2_ → extend original files instead | **絕不** 使用 enhanced_、improved_、new_、v2_ 等命名 → 改為擴展原始文件
+- **ALWAYS** provide descriptions in both English and Traditional Chinese | **始終** 提供英文和繁體中文雙語描述
 
 ### 📝 MANDATORY REQUIREMENTS | 強制要求
 - **COMMIT** after every completed task/phase - no exceptions | **提交** 每個完成的任務/階段後 - 無例外
@@ -40,12 +41,13 @@ This file provides essential guidance to Claude Code (claude.ai/code) when worki
 - **READ FILES FIRST** before editing - Edit/Write tools will fail if you didn't read the file first | **先讀取文件** 再編輯 - 如果沒有先讀取文件，編輯/寫入工具會失敗
 - **DEBT PREVENTION** - Before creating new files, check for existing similar functionality to extend | **債務預防** - 創建新文件前，檢查現有相似功能以進行擴展
 - **SINGLE SOURCE OF TRUTH** - One authoritative implementation per feature/concept | **單一真實來源** - 每個功能/概念只有一個權威實現
+- **BILINGUAL DESCRIPTIONS** - All descriptions, comments, and documentation must include both English and Traditional Chinese | **雙語描述** - 所有描述、註釋和文件必須包含英文和繁體中文
 
-### ⚡ EXECUTION PATTERNS
-- **PARALLEL TASK AGENTS** - Launch multiple Task agents simultaneously for maximum efficiency
-- **SYSTEMATIC WORKFLOW** - TodoWrite → Parallel agents → Git checkpoints → GitHub backup → Test validation
-- **GITHUB BACKUP WORKFLOW** - After every commit: `git push origin main` to maintain GitHub backup
-- **BACKGROUND PROCESSING** - ONLY Task agents can run true background operations
+### ⚡ EXECUTION PATTERNS | 執行模式
+- **PARALLEL TASK AGENTS** - Launch multiple Task agents simultaneously for maximum efficiency | **並行任務代理** - 同時啟動多個任務代理以實現最大效率
+- **SYSTEMATIC WORKFLOW** - TodoWrite → Parallel agents → Git checkpoints → GitHub backup → Test validation | **系統化工作流程** - TodoWrite → 並行代理 → Git檢查點 → GitHub備份 → 測試驗證
+- **GITHUB BACKUP WORKFLOW** - After every commit: `git push origin main` to maintain GitHub backup | **GITHUB備份工作流程** - 每次提交後：`git push origin main` 以維護GitHub備份
+- **BACKGROUND PROCESSING** - ONLY Task agents can run true background operations | **後台處理** - 只有任務代理可以運行真正的後台操作
 
 ### 🔍 MANDATORY PRE-TASK COMPLIANCE CHECK
 > **STOP: Before starting any task, Claude Code must explicitly verify ALL points:**
