@@ -1,43 +1,45 @@
-# CLAUDE.md - AIFX
+# CLAUDE.md - AIFX | CLAUDE 規範文件 - AIFX
 
-> **Documentation Version**: 1.0  
-> **Last Updated**: 2025-09-03  
-> **Project**: AIFX  
-> **Description**: Professional quantitative trading researcher. Medium-term forex quantitative trading strategy enhanced with AI models for EUR/USD and USD/JPY on 1-hour timeframe.  
-> **Features**: GitHub auto-backup, Task agents, technical debt prevention
+> **Documentation Version | 文件版本**: 1.0  
+> **Last Updated | 最後更新**: 2025-09-03  
+> **Project | 專案名稱**: AIFX  
+> **Description | 專案描述**: Professional quantitative trading researcher. Medium-term forex quantitative trading strategy enhanced with AI models for EUR/USD and USD/JPY on 1-hour timeframe. | 專業量化交易研究員。針對歐元/美元和美元/日圓貨幣對，使用1小時時間框架的中期外匯量化交易策略，結合AI模型增強。  
+> **Features | 功能特色**: GitHub auto-backup, Task agents, technical debt prevention | GitHub 自動備份、任務代理、技術債務預防
 
-This file provides essential guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides essential guidance to Claude Code (claude.ai/code) when working with code in this repository.  
+本文件為 Claude Code (claude.ai/code) 在此代碼庫工作時提供重要指導。
 
-## 🚨 CRITICAL RULES - READ FIRST
+## 🚨 CRITICAL RULES - READ FIRST | 重要規則 - 請先閱讀
 
-> **⚠️ RULE ADHERENCE SYSTEM ACTIVE ⚠️**  
-> **Claude Code must explicitly acknowledge these rules at task start**  
-> **These rules override all other instructions and must ALWAYS be followed:**
+> **⚠️ RULE ADHERENCE SYSTEM ACTIVE | 規則遵循系統已啟動 ⚠️**  
+> **Claude Code must explicitly acknowledge these rules at task start | Claude Code 必須在任務開始時明確確認這些規則**  
+> **These rules override all other instructions and must ALWAYS be followed: | 這些規則覆蓋所有其他指令，必須始終遵循：**
 
-### 🔄 **RULE ACKNOWLEDGMENT REQUIRED**
-> **Before starting ANY task, Claude Code must respond with:**  
-> "✅ CRITICAL RULES ACKNOWLEDGED - I will follow all prohibitions and requirements listed in CLAUDE.md"
+### 🔄 **RULE ACKNOWLEDGMENT REQUIRED | 規則確認必需**
+> **Before starting ANY task, Claude Code must respond with: | 在開始任何任務之前，Claude Code 必須回應：**  
+> "✅ CRITICAL RULES ACKNOWLEDGED - I will follow all prohibitions and requirements listed in CLAUDE.md"  
+> "✅ 重要規則已確認 - 我將遵循 CLAUDE.md 中列出的所有禁令和要求"
 
-### ❌ ABSOLUTE PROHIBITIONS
-- **NEVER** create new files in root directory → use proper module structure
-- **NEVER** write output files directly to root directory → use designated output folders
-- **NEVER** create documentation files (.md) unless explicitly requested by user
-- **NEVER** use git commands with -i flag (interactive mode not supported)
-- **NEVER** use `find`, `grep`, `cat`, `head`, `tail`, `ls` commands → use Read, LS, Grep, Glob tools instead
-- **NEVER** create duplicate files (manager_v2.py, enhanced_xyz.py, utils_new.js) → ALWAYS extend existing files
-- **NEVER** create multiple implementations of same concept → single source of truth
-- **NEVER** copy-paste code blocks → extract into shared utilities/functions
-- **NEVER** hardcode values that should be configurable → use config files/environment variables
-- **NEVER** use naming like enhanced_, improved_, new_, v2_ → extend original files instead
+### ❌ ABSOLUTE PROHIBITIONS | 絕對禁令
+- **NEVER** create new files in root directory → use proper module structure | **絕不** 在根目錄創建新文件 → 使用適當的模組結構
+- **NEVER** write output files directly to root directory → use designated output folders | **絕不** 直接在根目錄寫入輸出文件 → 使用指定的輸出資料夾
+- **NEVER** create documentation files (.md) unless explicitly requested by user | **絕不** 創建文件檔案 (.md) 除非用戶明確要求
+- **NEVER** use git commands with -i flag (interactive mode not supported) | **絕不** 使用帶 -i 標誌的 git 命令（不支援互動模式）
+- **NEVER** use `find`, `grep`, `cat`, `head`, `tail`, `ls` commands → use Read, LS, Grep, Glob tools instead | **絕不** 使用 `find`, `grep`, `cat`, `head`, `tail`, `ls` 命令 → 改用 Read、LS、Grep、Glob 工具
+- **NEVER** create duplicate files (manager_v2.py, enhanced_xyz.py, utils_new.js) → ALWAYS extend existing files | **絕不** 創建重複文件 (manager_v2.py, enhanced_xyz.py, utils_new.js) → 始終擴展現有文件
+- **NEVER** create multiple implementations of same concept → single source of truth | **絕不** 創建同一概念的多個實現 → 單一真實來源
+- **NEVER** copy-paste code blocks → extract into shared utilities/functions | **絕不** 複製貼上代碼區塊 → 提取到共享工具/函數中
+- **NEVER** hardcode values that should be configurable → use config files/environment variables | **絕不** 硬編碼應可配置的值 → 使用配置文件/環境變數
+- **NEVER** use naming like enhanced_, improved_, new_, v2_ → extend original files instead | **絕不** 使用 enhanced_、improved_、new_、v2_ 等命名 → 改為擴展原始文件
 
-### 📝 MANDATORY REQUIREMENTS
-- **COMMIT** after every completed task/phase - no exceptions
-- **GITHUB BACKUP** - Push to GitHub after every commit to maintain backup: `git push origin main`
-- **USE TASK AGENTS** for all long-running operations (>30 seconds) - Bash commands stop when context switches
-- **TODOWRITE** for complex tasks (3+ steps) → parallel agents → git checkpoints → test validation
-- **READ FILES FIRST** before editing - Edit/Write tools will fail if you didn't read the file first
-- **DEBT PREVENTION** - Before creating new files, check for existing similar functionality to extend  
-- **SINGLE SOURCE OF TRUTH** - One authoritative implementation per feature/concept
+### 📝 MANDATORY REQUIREMENTS | 強制要求
+- **COMMIT** after every completed task/phase - no exceptions | **提交** 每個完成的任務/階段後 - 無例外
+- **GITHUB BACKUP** - Push to GitHub after every commit to maintain backup: `git push origin main` | **GITHUB 備份** - 每次提交後推送到 GitHub 以維護備份：`git push origin main`
+- **USE TASK AGENTS** for all long-running operations (>30 seconds) - Bash commands stop when context switches | **使用任務代理** 處理所有長時間操作（>30秒）- Bash 命令在上下文切換時會停止
+- **TODOWRITE** for complex tasks (3+ steps) → parallel agents → git checkpoints → test validation | **TODOWRITE** 用於複雜任務（3+步驟）→ 並行代理 → git 檢查點 → 測試驗證
+- **READ FILES FIRST** before editing - Edit/Write tools will fail if you didn't read the file first | **先讀取文件** 再編輯 - 如果沒有先讀取文件，編輯/寫入工具會失敗
+- **DEBT PREVENTION** - Before creating new files, check for existing similar functionality to extend | **債務預防** - 創建新文件前，檢查現有相似功能以進行擴展
+- **SINGLE SOURCE OF TRUTH** - One authoritative implementation per feature/concept | **單一真實來源** - 每個功能/概念只有一個權威實現
 
 ### ⚡ EXECUTION PATTERNS
 - **PARALLEL TASK AGENTS** - Launch multiple Task agents simultaneously for maximum efficiency
@@ -144,56 +146,57 @@ gh repo view
 gh repo clone username/repo-name
 ```
 
-## 🏗️ PROJECT OVERVIEW
+## 🏗️ PROJECT OVERVIEW | 專案概述
 
-**AIFX** is a professional quantitative trading system that implements medium-term forex strategies enhanced with AI models. The system focuses on EUR/USD and USD/JPY trading pairs using 1-hour timeframes.
+**AIFX** is a professional quantitative trading system that implements medium-term forex strategies enhanced with AI models. The system focuses on EUR/USD and USD/JPY trading pairs using 1-hour timeframes.  
+**AIFX** 是一個專業的量化交易系統，實現結合AI模型的中期外匯策略。系統專注於歐元/美元和美元/日圓貨幣對，使用1小時時間框架。
 
-### 🎯 **DEVELOPMENT STATUS**
-- **Setup**: In Progress
-- **Core Features**: Pending
-- **Testing**: Pending
-- **Documentation**: Pending
+### 🎯 **DEVELOPMENT STATUS | 開發狀態**
+- **Setup | 設置**: In Progress | 進行中
+- **Core Features | 核心功能**: Pending | 待開發
+- **Testing | 測試**: Pending | 待開發
+- **Documentation | 文件**: Pending | 待開發
 
-### 🚀 **Key Features**
-- **Data & Feature Engineering**: Historical OHLCV data with technical indicators (MA, MACD, RSI, Bollinger Bands, ATR)
-- **AI Models**: Machine learning models (XGBoost, Random Forest, LSTM) for price direction prediction
-- **Strategy Logic**: Combined technical and AI signals with confidence filtering
-- **Risk Management**: Fixed percentage risk, stop-loss/take-profit using ATR multiples
-- **Backtesting**: Backtrader framework with comprehensive performance metrics
+### 🚀 **Key Features | 主要功能**
+- **Data & Feature Engineering | 數據與特徵工程**: Historical OHLCV data with technical indicators (MA, MACD, RSI, Bollinger Bands, ATR) | 歷史OHLCV數據配合技術指標（移動平均線、MACD、RSI、布林帶、ATR）
+- **AI Models | AI模型**: Machine learning models (XGBoost, Random Forest, LSTM) for price direction prediction | 機器學習模型（XGBoost、隨機森林、LSTM）用於價格方向預測
+- **Strategy Logic | 策略邏輯**: Combined technical and AI signals with confidence filtering | 結合技術和AI信號並進行信心過濾
+- **Risk Management | 風險管理**: Fixed percentage risk, stop-loss/take-profit using ATR multiples | 固定百分比風險、使用ATR倍數的止損/止盈
+- **Backtesting | 回測**: Backtrader framework with comprehensive performance metrics | Backtrader框架配合全面的績效指標
 
-### 📁 **AI/ML Project Structure**
+### 📁 **AI/ML Project Structure | AI/ML 專案結構**
 ```
 AIFX/
-├── CLAUDE.md              # Essential rules for Claude Code
-├── src/                   # Source code (NEVER put files in root)
-│   ├── main/              # Main application code
-│   │   ├── python/        # Python implementation
-│   │   │   ├── core/      # Core trading algorithms
-│   │   │   ├── utils/     # Data processing utilities
-│   │   │   ├── models/    # AI model implementations
-│   │   │   ├── services/  # Trading services and pipelines
-│   │   │   ├── training/  # Model training scripts
-│   │   │   ├── inference/ # Trading inference code
-│   │   │   └── evaluation/# Strategy evaluation
-│   │   └── resources/     # Configuration and assets
-│   │       ├── config/    # Trading configuration files
-│   │       └── data/      # Sample/seed data
-│   └── test/              # Test code
-├── data/                  # Dataset management
-│   ├── raw/               # Raw forex data
-│   ├── processed/         # Cleaned trading data
-│   └── external/          # External data sources
-├── notebooks/             # Analysis notebooks
-│   ├── exploratory/       # Data exploration
-│   ├── experiments/       # Strategy experiments
-│   └── reports/           # Trading reports
-├── models/                # Trained models
-│   ├── trained/           # Production models
-│   └── checkpoints/       # Training checkpoints
-├── experiments/           # Strategy experiments
-│   ├── configs/           # Experiment configs
-│   └── results/           # Backtest results
-└── output/                # Generated trading outputs
+├── CLAUDE.md              # Essential rules for Claude Code | Claude Code 重要規則
+├── src/                   # Source code (NEVER put files in root) | 源代碼（絕不在根目錄放文件）
+│   ├── main/              # Main application code | 主要應用程式代碼
+│   │   ├── python/        # Python implementation | Python 實現
+│   │   │   ├── core/      # Core trading algorithms | 核心交易演算法
+│   │   │   ├── utils/     # Data processing utilities | 數據處理工具
+│   │   │   ├── models/    # AI model implementations | AI模型實現
+│   │   │   ├── services/  # Trading services and pipelines | 交易服務與管道
+│   │   │   ├── training/  # Model training scripts | 模型訓練腳本
+│   │   │   ├── inference/ # Trading inference code | 交易推理代碼
+│   │   │   └── evaluation/# Strategy evaluation | 策略評估
+│   │   └── resources/     # Configuration and assets | 配置與資產
+│   │       ├── config/    # Trading configuration files | 交易配置文件
+│   │       └── data/      # Sample/seed data | 樣本/種子數據
+│   └── test/              # Test code | 測試代碼
+├── data/                  # Dataset management | 數據集管理
+│   ├── raw/               # Raw forex data | 原始外匯數據
+│   ├── processed/         # Cleaned trading data | 清理後的交易數據
+│   └── external/          # External data sources | 外部數據源
+├── notebooks/             # Analysis notebooks | 分析筆記本
+│   ├── exploratory/       # Data exploration | 數據探索
+│   ├── experiments/       # Strategy experiments | 策略實驗
+│   └── reports/           # Trading reports | 交易報告
+├── models/                # Trained models | 訓練好的模型
+│   ├── trained/           # Production models | 生產模型
+│   └── checkpoints/       # Training checkpoints | 訓練檢查點
+├── experiments/           # Strategy experiments | 策略實驗
+│   ├── configs/           # Experiment configs | 實驗配置
+│   └── results/           # Backtest results | 回測結果
+└── output/                # Generated trading outputs | 生成的交易輸出
 ```
 
 ## 📋 NEED HELP? START HERE
