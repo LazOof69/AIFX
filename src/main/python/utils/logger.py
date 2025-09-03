@@ -14,7 +14,7 @@ Features | 功能:
 import os
 import sys
 import logging
-import structlog
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -49,12 +49,34 @@ class TradingEventType(Enum):
     ERROR_OCCURRED = "ERROR_OCCURRED"        # Error events | 錯誤事件
 
 
+class JSONFormatter(logging.Formatter):
+    """Custom JSON formatter for structured logging | 用於結構化日誌的自定義JSON格式器"""
+    
+    def format(self, record):
+        log_obj = {
+            'timestamp': datetime.fromtimestamp(record.created).isoformat(),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage()
+        }
+        
+        # Add any extra attributes | 添加任何額外屬性
+        for key, value in record.__dict__.items():
+            if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 'filename',
+                          'module', 'exc_info', 'exc_text', 'stack_info', 'lineno', 'funcName',
+                          'created', 'msecs', 'relativeCreated', 'thread', 'threadName',
+                          'processName', 'process', 'getMessage']:
+                log_obj[key] = value
+        
+        return json.dumps(log_obj)
+
+
 def setup_logging(
     log_level: str = "INFO",
     log_to_file: bool = True,
     log_to_console: bool = True,
     log_dir: Optional[str] = None
-) -> structlog.stdlib.BoundLogger:
+) -> logging.Logger:
     """
     Setup structured logging for AIFX system | 為AIFX系統設置結構化日誌
     
@@ -67,19 +89,6 @@ def setup_logging(
     Returns:
         Configured logger instance | 配置好的日誌器實例
     """
-    # Configure structlog | 配置structlog
-    structlog.configure(
-        processors=[
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.add_log_level,
-            structlog.processors.add_logger_name,
-            structlog.processors.JSONRenderer()
-        ],
-        wrapper_class=structlog.stdlib.BoundLogger,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        cache_logger_on_first_use=True,
-    )
-    
     # Get root logger | 獲取根日誌器
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level.upper()))
@@ -116,12 +125,12 @@ def setup_logging(
         file_handler.setLevel(getattr(logging, log_level.upper()))
         
         # JSON formatter for files | 文件的JSON格式器
-        file_formatter = logging.Formatter('%(message)s')
+        file_formatter = JSONFormatter()
         file_handler.setFormatter(file_formatter)
         root_logger.addHandler(file_handler)
     
     # Return configured logger | 返回配置好的日誌器
-    return structlog.get_logger("AIFX")
+    return logging.getLogger("AIFX")
 
 
 class AIFXLogger:
@@ -136,7 +145,7 @@ class AIFXLogger:
         Args:
             logger_name: Name of the logger | 日誌器名稱
         """
-        self.logger = structlog.get_logger(logger_name)
+        self.logger = logging.getLogger(logger_name)
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     def log_trading_event(
@@ -163,8 +172,9 @@ class AIFXLogger:
         
         if symbol:
             context["symbol"] = symbol
-            
-        self.logger.info(message, **context)
+        
+        # Create log record with extra attributes | 創建帶額外屬性的日誌記錄
+        self.logger.info(message, extra=context)
     
     def log_data_event(
         self,
@@ -200,7 +210,7 @@ class AIFXLogger:
         if records_count:
             message += f" - {records_count} records"
             
-        self.logger.info(message, **context)
+        self.logger.info(message, extra=context)
     
     def log_model_prediction(
         self,
@@ -316,7 +326,7 @@ class AIFXLogger:
         if action_taken:
             message += f" -> {action_taken}"
             
-        self.logger.warning(message, **context)
+        self.logger.warning(message, extra=context)
     
     def log_backtest_summary(
         self,
@@ -366,19 +376,20 @@ class AIFXLogger:
     
     def error(self, message: str, **kwargs) -> None:
         """Log error message | 記錄錯誤消息"""
-        self.logger.error(message, event_type=TradingEventType.ERROR_OCCURRED.value, **kwargs)
+        kwargs['event_type'] = TradingEventType.ERROR_OCCURRED.value
+        self.logger.error(message, extra=kwargs)
     
     def warning(self, message: str, **kwargs) -> None:
         """Log warning message | 記錄警告消息"""
-        self.logger.warning(message, **kwargs)
+        self.logger.warning(message, extra=kwargs)
     
     def info(self, message: str, **kwargs) -> None:
         """Log info message | 記錄信息消息"""
-        self.logger.info(message, **kwargs)
+        self.logger.info(message, extra=kwargs)
     
     def debug(self, message: str, **kwargs) -> None:
         """Log debug message | 記錄調試消息"""
-        self.logger.debug(message, **kwargs)
+        self.logger.debug(message, extra=kwargs)
 
 
 # Global logger instance | 全局日誌器實例
