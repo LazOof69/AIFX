@@ -1,0 +1,74 @@
+# AIFX - AI-Enhanced Forex Trading System Dependencies
+# AIFX - AI增強外匯交易系統依賴項
+
+# Core Data Processing | 核心數據處理
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Financial Data & Technical Analysis | 金融數據與技術分析
+yfinance>=0.2.0              # Yahoo Finance data download | Yahoo財經數據下載
+pandas-ta>=0.3.14b0          # Technical analysis indicators | 技術分析指標
+ta-lib>=0.4.0                # Technical Analysis Library | 技術分析庫
+mplfinance>=0.12.0           # Financial plotting | 金融圖表
+
+# Machine Learning | 機器學習
+scikit-learn>=1.3.0          # ML algorithms and utilities | ML演算法和工具
+xgboost>=1.7.0               # Gradient boosting framework | 梯度提升框架
+lightgbm>=4.0.0              # Light gradient boosting | 輕量級梯度提升
+
+# Deep Learning | 深度學習
+tensorflow>=2.13.0           # Deep learning framework | 深度學習框架
+keras>=2.13.0                # High-level neural networks API | 高級神經網絡API
+
+# Alternative Deep Learning (choose one) | 替代深度學習（選擇其一）
+# torch>=2.0.0               # PyTorch deep learning | PyTorch深度學習
+# torchvision>=0.15.0        # Computer vision for PyTorch | PyTorch計算機視覺
+
+# Backtesting & Trading | 回測與交易
+backtrader>=1.9.78.123       # Backtesting framework | 回測框架
+zipline-reloaded>=2.2.0      # Algorithmic trading library | 演算法交易庫
+
+# Data Visualization | 數據可視化
+matplotlib>=3.7.0            # Basic plotting | 基礎繪圖
+seaborn>=0.12.0              # Statistical visualization | 統計可視化
+plotly>=5.15.0               # Interactive plotting | 互動式繪圖
+
+# Development & Testing | 開發與測試
+pytest>=7.4.0               # Testing framework | 測試框架
+pytest-cov>=4.1.0           # Coverage testing | 覆蓋率測試
+black>=23.0.0                # Code formatter | 代碼格式化
+flake8>=6.0.0                # Code linting | 代碼檢查
+
+# Jupyter & Analysis | Jupyter與分析
+jupyter>=1.0.0               # Jupyter notebook | Jupyter筆記本
+ipywidgets>=8.0.0            # Interactive widgets | 互動式小部件
+notebook>=7.0.0              # Notebook interface | 筆記本界面
+
+# Configuration & Utilities | 配置與工具
+python-dotenv>=1.0.0         # Environment variables | 環境變數
+pyyaml>=6.0                  # YAML configuration | YAML配置
+requests>=2.31.0             # HTTP requests | HTTP請求
+tqdm>=4.65.0                 # Progress bars | 進度條
+
+# Database & Storage | 數據庫與存儲
+sqlalchemy>=2.0.0            # SQL toolkit | SQL工具包
+h5py>=3.9.0                  # HDF5 binary data | HDF5二進制數據
+
+# Time & Date Handling | 時間與日期處理
+pytz>=2023.3                 # Timezone handling | 時區處理
+python-dateutil>=2.8.0       # Date utilities | 日期工具
+
+# Performance & Optimization | 性能與優化
+numba>=0.57.0                # JIT compiler | JIT編譯器
+joblib>=1.3.0                # Parallel computing | 並行計算
+
+# Risk Management | 風險管理
+empyrical>=0.5.5             # Financial risk metrics | 金融風險指標
+
+# API & Real-time Data (Optional) | API與實時數據（可選）
+websocket-client>=1.6.0      # WebSocket client | WebSocket客戶端
+ccxt>=4.0.0                  # Cryptocurrency exchange | 加密貨幣交易所
+
+# Logging & Monitoring | 日誌與監控
+structlog>=23.0.0            # Structured logging | 結構化日誌

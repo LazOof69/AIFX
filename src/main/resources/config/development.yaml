@@ -1,0 +1,70 @@
+# AIFX Development Configuration | AIFX開發配置
+# This configuration is used for development and testing | 此配置用於開發和測試
+
+# Trading configuration | 交易配置
+trading:
+  symbols: ["EURUSD=X", "USDJPY=X"]
+  timeframe: "1h"
+  risk_per_trade: 0.01  # 1% risk per trade | 每筆交易1%風險
+  max_positions: 1
+  stop_loss_atr_multiplier: 2.0
+  take_profit_atr_multiplier: 3.0
+  min_confidence_threshold: 0.6
+
+# Data configuration | 數據配置
+data:
+  data_source: "yahoo"
+  raw_data_path: "data/raw"
+  processed_data_path: "data/processed"
+  lookback_years: 3
+  min_data_points: 1000
+  max_missing_percentage: 0.05
+
+# Model configuration | 模型配置
+model:
+  # XGBoost parameters | XGBoost參數
+  xgb_params:
+    n_estimators: 100
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    random_state: 42
+    eval_metric: "logloss"
+    
+  # Random Forest parameters | 隨機森林參數
+  rf_params:
+    n_estimators: 100
+    max_depth: 10
+    min_samples_split: 5
+    min_samples_leaf: 2
+    random_state: 42
+    
+  # LSTM parameters | LSTM參數
+  lstm_params:
+    sequence_length: 60
+    lstm_units: [50, 30]
+    dropout: 0.2
+    epochs: 50  # Reduced for development | 為開發減少
+    batch_size: 32
+    learning_rate: 0.001
+    validation_split: 0.2
+    
+  # Feature engineering | 特徵工程
+  feature_window: 20
+  prediction_horizon: 1
+
+# Backtesting configuration | 回測配置
+backtest:
+  initial_cash: 100000.0
+  commission: 0.0002  # 0.02% per trade | 每筆交易0.02%
+  slippage: 0.0001    # 0.01% slippage | 0.01%滑點
+  start_date: "2022-01-01"
+  end_date: "2024-01-01"
+
+# Logging configuration | 日誌配置
+logging:
+  level: "INFO"
+  log_to_file: true
+  log_to_console: true
+  log_dir: "logs"

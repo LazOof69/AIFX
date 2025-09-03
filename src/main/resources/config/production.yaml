@@ -1,0 +1,73 @@
+# AIFX Production Configuration | AIFX生產配置
+# This configuration is used for live trading | 此配置用於實盤交易
+
+# Trading configuration | 交易配置
+trading:
+  symbols: ["EURUSD=X", "USDJPY=X"]
+  timeframe: "1h"
+  risk_per_trade: 0.005  # Reduced risk for production | 生產環境降低風險
+  max_positions: 2
+  stop_loss_atr_multiplier: 1.5  # Tighter stops | 更緊的止損
+  take_profit_atr_multiplier: 2.5
+  min_confidence_threshold: 0.65  # Higher confidence required | 需要更高信心
+
+# Data configuration | 數據配置
+data:
+  data_source: "yahoo"
+  raw_data_path: "data/raw"
+  processed_data_path: "data/processed"
+  lookback_years: 5  # More historical data | 更多歷史數據
+  min_data_points: 2000  # Higher requirement | 更高要求
+  max_missing_percentage: 0.02  # Stricter data quality | 更嚴格的數據質量
+
+# Model configuration | 模型配置
+model:
+  # XGBoost parameters (optimized) | XGBoost參數（優化後）
+  xgb_params:
+    n_estimators: 200
+    max_depth: 8
+    learning_rate: 0.05
+    subsample: 0.9
+    colsample_bytree: 0.9
+    random_state: 42
+    eval_metric: "logloss"
+    early_stopping_rounds: 20
+    
+  # Random Forest parameters (optimized) | 隨機森林參數（優化後）
+  rf_params:
+    n_estimators: 200
+    max_depth: 15
+    min_samples_split: 3
+    min_samples_leaf: 1
+    random_state: 42
+    n_jobs: -1
+    
+  # LSTM parameters (optimized) | LSTM參數（優化後）
+  lstm_params:
+    sequence_length: 80
+    lstm_units: [64, 32, 16]
+    dropout: 0.3
+    epochs: 200
+    batch_size: 64
+    learning_rate: 0.0005
+    validation_split: 0.2
+    patience: 30
+    
+  # Feature engineering | 特徵工程
+  feature_window: 30
+  prediction_horizon: 1
+
+# Backtesting configuration | 回測配置
+backtest:
+  initial_cash: 1000000.0  # Higher capital for production testing | 生產測試更高資本
+  commission: 0.0002
+  slippage: 0.0001
+  start_date: "2020-01-01"  # Longer backtest period | 更長回測期間
+  end_date: "2024-01-01"
+
+# Logging configuration | 日誌配置
+logging:
+  level: "WARNING"  # Less verbose in production | 生產環境較少詳細信息
+  log_to_file: true
+  log_to_console: false
+  log_dir: "logs/production"
