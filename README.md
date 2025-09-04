@@ -97,10 +97,17 @@ AIFX/
 - **Always search first** before creating new files | **創建新文件前先搜索** 現有實現
 - **Extend existing** functionality rather than duplicating | **擴展現有** 功能而非重複開發
 - **Use Task agents** for operations >30 seconds | **使用任務代理** 處理超過30秒的操作
+- **Documentation compliance** - Update UPDATE.log and check README.md after every change | **文件合規性** - 每次更改後更新UPDATE.log並檢查README.md
 - **Single source of truth** for all functionality | 所有功能保持 **單一真實來源**
 - **Language-agnostic structure** - works with Python, JS, Java, etc. | **語言無關結構** - 支援 Python、JS、Java 等
 - **Scalable** - start simple, grow as needed | **可擴展** - 從簡單開始，按需增長
 - **Flexible** - choose complexity level based on project needs | **靈活性** - 根據專案需求選擇複雜度級別
+
+### 📝 Documentation Standards | 文件標準
+- **UPDATE.log**: Mandatory milestone tracking for all significant changes | 所有重大更改的強制里程碑追蹤
+- **README.md**: Must reflect current project status and capabilities | 必須反映當前專案狀態和功能  
+- **CHANGELOG.md**: Semantic versioning with comprehensive release notes | 語義化版本控制配合全面發布說明
+- **Bilingual**: All documentation in English and Traditional Chinese | 所有文件均為英文和繁體中文雙語
 
 ## 🚀 Installation & Setup | 安裝與設置
 
