@@ -1,0 +1,75 @@
+# AIFX - Production Dependencies
+# AIFX - 生產環境依賴項
+# Additional packages required for production deployment
+
+# ============================================================================
+# Web Server & WSGI | Web服務器和WSGI
+# ============================================================================
+gunicorn>=21.0.0              # WSGI HTTP Server for production | 生產環境的WSGI HTTP服務器
+uvicorn[standard]>=0.23.0     # ASGI server for async applications | 異步應用的ASGI服務器
+fastapi>=0.104.0              # Modern web framework for APIs | 現代API網路框架
+
+# ============================================================================
+# Database Drivers | 資料庫驅動程式
+# ============================================================================
+psycopg2-binary>=2.9.0        # PostgreSQL adapter for Python | Python的PostgreSQL適配器
+redis>=4.6.0                  # Redis client for Python | Python的Redis客戶端
+pymongo>=4.5.0                # MongoDB driver for Python | Python的MongoDB驅動程式
+
+# ============================================================================
+# Monitoring & Observability | 監控與可觀察性
+# ============================================================================
+prometheus-client>=0.18.0     # Prometheus metrics client | Prometheus指標客戶端
+structlog>=23.0.0             # Structured logging | 結構化日誌
+elasticsearch>=8.10.0         # Elasticsearch client | Elasticsearch客戶端
+APScheduler>=3.10.0           # Advanced Python Scheduler | 高級Python調度器
+
+# ============================================================================
+# Security & Authentication | 安全與認證
+# ============================================================================
+cryptography>=41.0.0          # Cryptographic recipes and primitives | 加密配方和原語
+PyJWT>=2.8.0                  # JSON Web Token implementation | JSON Web Token實現
+passlib[bcrypt]>=1.7.0        # Password hashing library | 密碼哈希庫
+python-multipart>=0.0.6       # Multipart form data parser | 多部分表單數據解析器
+
+# ============================================================================
+# Configuration Management | 配置管理
+# ============================================================================
+pydantic>=2.4.0               # Data validation using Python type hints | 使用Python類型提示進行數據驗證
+pydantic-settings>=2.0.0      # Settings management using Pydantic | 使用Pydantic進行設置管理
+
+# ============================================================================
+# HTTP Client & API | HTTP客戶端和API
+# ============================================================================
+httpx>=0.25.0                 # HTTP client for Python 3 | Python 3的HTTP客戶端
+aiohttp>=3.9.0                # Async HTTP client/server | 異步HTTP客戶端/服務器
+
+# ============================================================================
+# Background Tasks & Queue | 後台任務與隊列
+# ============================================================================
+celery>=5.3.0                 # Distributed task queue | 分布式任務隊列
+kombu>=5.3.0                  # Messaging library for Python | Python消息傳遞庫
+
+# ============================================================================
+# Data Serialization | 數據序列化
+# ============================================================================
+msgpack>=1.0.0                # MessagePack serializer | MessagePack序列化器
+orjson>=3.9.0                 # Fast JSON library | 快速JSON庫
+
+# ============================================================================
+# System Monitoring | 系統監控
+# ============================================================================
+psutil>=5.9.0                 # Cross-platform process and system utilities | 跨平台進程和系統工具
+py-cpuinfo>=9.0.0             # CPU information | CPU信息
+
+# ============================================================================
+# Production Utilities | 生產工具
+# ============================================================================
+click>=8.1.0                  # Command line interface creation kit | 命令行界面創建工具包
+rich>=13.0.0                  # Rich text and beautiful formatting | 豐富文本和美觀格式化
+typer>=0.9.0                  # CLI library using Python type hints | 使用Python類型提示的CLI庫
+
+# ============================================================================
+# Health Checks & Readiness | 健康檢查與就緒性
+# ============================================================================
+py-healthcheck>=1.10.0        # Health check library | 健康檢查庫

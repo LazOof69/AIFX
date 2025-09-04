@@ -1,0 +1,234 @@
+# AIFX - AI-Enhanced Forex Trading System
+# Docker Compose Configuration for Development
+# AIFX - AI增強外匯交易系統
+# 開發環境的Docker Compose配置
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # AIFX Main Application | AIFX主應用程式
+  # ============================================================================
+  aifx-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: aifx-app-dev
+    ports:
+      - "8000:8000"
+      - "8001:8001"  # Debug port
+    environment:
+      - AIFX_ENV=development
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
+    volumes:
+      - ./src:/home/aifx/app/src
+      - ./config:/home/aifx/app/config
+      - ./data:/home/aifx/app/data
+      - ./models:/home/aifx/app/models
+      - ./logs:/home/aifx/app/logs
+      - ./output:/home/aifx/app/output
+    depends_on:
+      - postgres
+      - redis
+      - mongodb
+    networks:
+      - aifx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================================
+  # PostgreSQL Database | PostgreSQL資料庫
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: aifx-postgres-dev
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=aifx_dev
+      - POSTGRES_USER=aifx_user
+      - POSTGRES_PASSWORD=aifx_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - aifx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aifx_user -d aifx_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # Redis Cache | Redis緩存
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: aifx-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - aifx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # MongoDB for Time Series Data | MongoDB時間序列數據
+  # ============================================================================
+  mongodb:
+    image: mongo:7
+    container_name: aifx-mongodb-dev
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=aifx_admin
+      - MONGO_INITDB_ROOT_PASSWORD=aifx_mongo_password
+      - MONGO_INITDB_DATABASE=aifx_timeseries
+    volumes:
+      - mongodb_data:/data/db
+      - ./database/mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - aifx-network
+    restart: unless-stopped
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # ============================================================================
+  # Elasticsearch for Logging | Elasticsearch日誌系統
+  # ============================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    container_name: aifx-elasticsearch-dev
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - aifx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ============================================================================
+  # Kibana for Log Visualization | Kibana日誌可視化
+  # ============================================================================
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.0
+    container_name: aifx-kibana-dev
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - aifx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ============================================================================
+  # Grafana for Metrics Visualization | Grafana指標可視化
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: aifx-grafana-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=aifx_grafana_password
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana:/etc/grafana/provisioning
+    networks:
+      - aifx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ============================================================================
+  # Prometheus for Metrics Collection | Prometheus指標收集
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: aifx-prometheus-dev
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - prometheus_data:/prometheus
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - aifx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+# ============================================================================
+# Networks | 網絡配置
+# ============================================================================
+networks:
+  aifx-network:
+    driver: bridge
+    name: aifx-network
+
+# ============================================================================
+# Volumes | 數據卷配置
+# ============================================================================
+volumes:
+  postgres_data:
+    name: aifx-postgres-data
+  redis_data:
+    name: aifx-redis-data
+  mongodb_data:
+    name: aifx-mongodb-data
+  elasticsearch_data:
+    name: aifx-elasticsearch-data
+  grafana_data:
+    name: aifx-grafana-data
+  prometheus_data:
+    name: aifx-prometheus-data

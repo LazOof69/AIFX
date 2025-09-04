@@ -1,0 +1,385 @@
+# AIFX - AI-Enhanced Forex Trading System
+# Docker Compose Configuration for Production
+# AIFX - AI增強外匯交易系統
+# 生產環境的Docker Compose配置
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # AIFX Main Application - Production | AIFX主應用程式 - 生產環境
+  # ============================================================================
+  aifx-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: aifx-app-prod
+    ports:
+      - "8000:8000"
+    environment:
+      - AIFX_ENV=production
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - MONGODB_HOST=mongodb
+      - LOG_LEVEL=INFO
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+    volumes:
+      - ./config:/home/aifx/app/config:ro
+      - app_logs:/home/aifx/app/logs
+      - app_data:/home/aifx/app/data
+      - trained_models:/home/aifx/app/models:ro
+      - trading_output:/home/aifx/app/output
+    depends_on:
+      - postgres
+      - redis
+      - mongodb
+    networks:
+      - aifx-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+      replicas: 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================================
+  # Load Balancer | 負載均衡器
+  # ============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: aifx-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - aifx-app
+    networks:
+      - aifx-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # PostgreSQL Database - Production | PostgreSQL資料庫 - 生產環境
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: aifx-postgres-prod
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_MAX_CONNECTIONS=200
+      - POSTGRES_SHARED_BUFFERS=256MB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=1GB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_backups:/backups
+      - ./database/init-prod:/docker-entrypoint-initdb.d:ro
+    networks:
+      - aifx-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================================
+  # Redis Cache - Production | Redis緩存 - 生產環境
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: aifx-redis-prod
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./config/redis-prod.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - aifx-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ============================================================================
+  # MongoDB - Production | MongoDB - 生產環境
+  # ============================================================================
+  mongodb:
+    image: mongo:7
+    container_name: aifx-mongodb-prod
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_DATABASE}
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_backups:/backups
+      - ./database/mongo-init-prod:/docker-entrypoint-initdb.d:ro
+    networks:
+      - aifx-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/${MONGO_DATABASE} --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================================
+  # Elasticsearch - Production | Elasticsearch - 生產環境
+  # ============================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    container_name: aifx-elasticsearch-prod
+    environment:
+      - cluster.name=aifx-cluster
+      - node.name=aifx-node-1
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=true
+      - xpack.security.enrollment.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+      - elasticsearch_backups:/backups
+    networks:
+      - aifx-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================================
+  # Prometheus - Production | Prometheus - 生產環境
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: aifx-prometheus-prod
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - prometheus_data:/prometheus
+      - ./config/prometheus-prod.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus-rules:/etc/prometheus/rules:ro
+    networks:
+      - aifx-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================================
+  # Grafana - Production | Grafana - 生產環境
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: aifx-grafana-prod
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=https://grafana.aifx.local
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana-prod:/etc/grafana/provisioning:ro
+      - grafana_logs:/var/log/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - aifx-network
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================================
+  # Backup Service | 備份服務
+  # ============================================================================
+  backup:
+    build:
+      context: ./docker/backup
+      dockerfile: Dockerfile
+    container_name: aifx-backup-prod
+    environment:
+      - BACKUP_SCHEDULE=0 2 * * *  # Daily at 2 AM
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - MONGO_HOST=mongodb
+      - MONGO_DATABASE=${MONGO_DATABASE}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+    volumes:
+      - postgres_backups:/postgres-backups
+      - mongodb_backups:/mongodb-backups
+      - elasticsearch_backups:/elasticsearch-backups
+      - backup_logs:/var/log/backup
+    depends_on:
+      - postgres
+      - mongodb
+      - elasticsearch
+    networks:
+      - aifx-network
+    restart: always
+
+# ============================================================================
+# Networks | 網絡配置
+# ============================================================================
+networks:
+  aifx-network:
+    driver: bridge
+    name: aifx-prod-network
+
+# ============================================================================
+# Volumes | 數據卷配置
+# ============================================================================
+volumes:
+  # Application volumes | 應用程式數據卷
+  app_logs:
+    name: aifx-app-logs-prod
+  app_data:
+    name: aifx-app-data-prod
+  trained_models:
+    name: aifx-models-prod
+  trading_output:
+    name: aifx-output-prod
+  nginx_logs:
+    name: aifx-nginx-logs-prod
+  
+  # Database volumes | 資料庫數據卷
+  postgres_data:
+    name: aifx-postgres-data-prod
+  postgres_backups:
+    name: aifx-postgres-backups-prod
+  redis_data:
+    name: aifx-redis-data-prod
+  mongodb_data:
+    name: aifx-mongodb-data-prod
+  mongodb_backups:
+    name: aifx-mongodb-backups-prod
+  
+  # Monitoring volumes | 監控數據卷
+  elasticsearch_data:
+    name: aifx-elasticsearch-data-prod
+  elasticsearch_backups:
+    name: aifx-elasticsearch-backups-prod
+  grafana_data:
+    name: aifx-grafana-data-prod
+  grafana_logs:
+    name: aifx-grafana-logs-prod
+  prometheus_data:
+    name: aifx-prometheus-data-prod
+  
+  # Backup volumes | 備份數據卷
+  backup_logs:
+    name: aifx-backup-logs-prod

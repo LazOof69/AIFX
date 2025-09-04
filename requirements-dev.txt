@@ -1,0 +1,55 @@
+# AIFX - Development Dependencies
+# AIFX - 開發環境依賴項
+# Additional packages for development and debugging
+
+# ============================================================================
+# Development Tools | 開發工具
+# ============================================================================
+black>=23.0.0                 # Code formatter | 代碼格式化器
+isort>=5.12.0                 # Import sorter | 導入排序器
+flake8>=6.0.0                 # Code linter | 代碼檢查器
+mypy>=1.5.0                   # Static type checker | 靜態類型檢查器
+pre-commit>=3.4.0             # Git hooks framework | Git鉤子框架
+
+# ============================================================================
+# Debugging & Profiling | 調試與性能分析
+# ============================================================================
+ipdb>=0.13.0                  # IPython debugger | IPython調試器
+memory-profiler>=0.61.0       # Memory usage profiler | 內存使用分析器
+line-profiler>=4.1.0          # Line-by-line profiler | 逐行性能分析器
+py-spy>=0.3.0                 # Sampling profiler for Python | Python採樣分析器
+
+# ============================================================================
+# Interactive Development | 互動開發
+# ============================================================================
+ipython>=8.15.0               # Enhanced interactive Python shell | 增強的互動式Python shell
+jupyter>=1.0.0                # Jupyter notebook | Jupyter筆記本
+jupyterlab>=4.0.0             # JupyterLab environment | JupyterLab環境
+notebook>=7.0.0               # Jupyter notebook interface | Jupyter筆記本界面
+
+# ============================================================================
+# Documentation | 文檔
+# ============================================================================
+sphinx>=7.0.0                 # Documentation generator | 文檔生成器
+sphinx-rtd-theme>=1.3.0       # Read the Docs theme | Read the Docs主題
+mkdocs>=1.5.0                 # Documentation site generator | 文檔站點生成器
+mkdocs-material>=9.0.0        # Material Design theme for MkDocs | MkDocs的Material Design主題
+
+# ============================================================================
+# API Development | API開發
+# ============================================================================
+httpie>=3.2.0                 # Command-line HTTP client | 命令行HTTP客戶端
+requests-mock>=1.11.0         # Mock HTTP requests | 模擬HTTP請求
+
+# ============================================================================
+# Database Development | 資料庫開發
+# ============================================================================
+alembic>=1.12.0               # Database migration tool | 資料庫遷移工具
+sqlalchemy>=2.0.0             # SQL toolkit and ORM | SQL工具包和ORM
+
+# ============================================================================
+# Development Utilities | 開發工具
+# ============================================================================
+python-dotenv>=1.0.0          # Load environment variables from .env | 從.env加載環境變數
+watchdog>=3.0.0               # File system event monitoring | 文件系統事件監控
+faker>=19.0.0                 # Generate fake data | 生成虛假數據
