@@ -36,6 +36,7 @@ This file provides essential guidance to Claude Code (claude.ai/code) when worki
 ### 📝 MANDATORY REQUIREMENTS | 強制要求
 - **COMMIT** after every completed task/phase - no exceptions | **提交** 每個完成的任務/階段後 - 無例外
 - **GITHUB BACKUP** - Push to GitHub after every commit to maintain backup: `git push origin main` | **GITHUB 備份** - 每次提交後推送到 GitHub 以維護備份：`git push origin main`
+- **DOCUMENTATION UPDATES** - After every update: UPDATE UPDATE.log AND check if README.md needs updates | **文件更新** - 每次更新後：更新 UPDATE.log 並檢查 README.md 是否需要更新
 - **USE TASK AGENTS** for all long-running operations (>30 seconds) - Bash commands stop when context switches | **使用任務代理** 處理所有長時間操作（>30秒）- Bash 命令在上下文切換時會停止
 - **TODOWRITE** for complex tasks (3+ steps) → parallel agents → git checkpoints → test validation | **TODOWRITE** 用於複雜任務（3+步驟）→ 並行代理 → git 檢查點 → 測試驗證
 - **READ FILES FIRST** before editing - Edit/Write tools will fail if you didn't read the file first | **先讀取文件** 再編輯 - 如果沒有先讀取文件，編輯/寫入工具會失敗
@@ -45,7 +46,7 @@ This file provides essential guidance to Claude Code (claude.ai/code) when worki
 
 ### ⚡ EXECUTION PATTERNS | 執行模式
 - **PARALLEL TASK AGENTS** - Launch multiple Task agents simultaneously for maximum efficiency | **並行任務代理** - 同時啟動多個任務代理以實現最大效率
-- **SYSTEMATIC WORKFLOW** - TodoWrite → Parallel agents → Git checkpoints → GitHub backup → Test validation | **系統化工作流程** - TodoWrite → 並行代理 → Git檢查點 → GitHub備份 → 測試驗證
+- **SYSTEMATIC WORKFLOW** - TodoWrite → Parallel agents → Git checkpoints → Documentation updates (UPDATE.log + README.md check) → GitHub backup → Test validation | **系統化工作流程** - TodoWrite → 並行代理 → Git檢查點 → 文件更新（UPDATE.log + README.md檢查）→ GitHub備份 → 測試驗證
 - **GITHUB BACKUP WORKFLOW** - After every commit: `git push origin main` to maintain GitHub backup | **GITHUB備份工作流程** - 每次提交後：`git push origin main` 以維護GitHub備份
 - **BACKGROUND PROCESSING** - ONLY Task agents can run true background operations | **後台處理** - 只有任務代理可以運行真正的後台操作
 
@@ -71,7 +72,12 @@ This file provides essential guidance to Claude Code (claude.ai/code) when worki
 - [ ] Can I extend existing code instead of creating new? → Prefer extension over creation
 - [ ] Am I about to copy-paste code? → Extract to shared utility instead
 
-**Step 4: Session Management**
+**Step 4: Documentation Compliance**
+- [ ] Will this update require UPDATE.log entry? → If YES, plan to update after completion
+- [ ] Will this change affect README.md accuracy? → If YES, check and update README.md
+- [ ] Are all changes properly documented? → Ensure bilingual descriptions
+
+**Step 5: Session Management**
 - [ ] Is this a long/complex task? → If YES, plan context checkpoints
 - [ ] Have I been working >1 hour? → If YES, consider /compact or session break
 
