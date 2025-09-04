@@ -154,10 +154,10 @@ gh repo clone username/repo-name
 **AIFX** 是一個專業的量化交易系統，實現結合AI模型的中期外匯策略。系統專注於歐元/美元和美元/日圓貨幣對，使用1小時時間框架。
 
 ### 🎯 **DEVELOPMENT STATUS | 開發狀態**
-- **Setup | 設置**: In Progress | 進行中
-- **Core Features | 核心功能**: Pending | 待開發
-- **Testing | 測試**: Pending | 待開發
-- **Documentation | 文件**: Pending | 待開發
+- **Phase 1 - Infrastructure | 第一階段 - 基礎設施**: ✅ COMPLETED | 已完成
+- **Phase 2 - AI Models | 第二階段 - AI模型**: 🔄 NEXT | 下一階段  
+- **Phase 3 - Strategy Integration | 第三階段 - 策略整合**: ⏳ PLANNED | 計劃中
+- **Phase 4 - Production | 第四階段 - 生產**: ⏳ PLANNED | 計劃中
 
 ### 🚀 **Key Features | 主要功能**
 - **Data & Feature Engineering | 數據與特徵工程**: Historical OHLCV data with technical indicators (MA, MACD, RSI, Bollinger Bands, ATR) | 歷史OHLCV數據配合技術指標（移動平均線、MACD、RSI、布林帶、ATR）
@@ -265,3 +265,296 @@ Edit(file_path="src/main/python/core/existing_strategy.py", old_string="...", ne
 **⚠️ Prevention is better than consolidation - build clean from the start.**  
 **🎯 Focus on single source of truth and extending existing functionality.**  
 **📈 Each task should maintain clean architecture and prevent technical debt.**
+
+---
+
+# 🗺️ AIFX PROJECT ROADMAP | AIFX 專案路線圖
+
+> **📋 COMPREHENSIVE PROJECT PLAN | 綜合專案計劃**  
+> **Last Updated | 最後更新**: 2025-09-04  
+> **Current Phase | 當前階段**: Phase 1 ✅ COMPLETED → Phase 2 🔄 NEXT  
+
+## 📊 **OVERALL PROGRESS | 整體進度**
+
+```
+Phase 1: Infrastructure    ████████████████████ 100% ✅ COMPLETED
+Phase 2: AI Models         ░░░░░░░░░░░░░░░░░░░░   0% 🔄 NEXT
+Phase 3: Strategy          ░░░░░░░░░░░░░░░░░░░░   0% ⏳ PLANNED  
+Phase 4: Production        ░░░░░░░░░░░░░░░░░░░░   0% ⏳ PLANNED
+```
+
+---
+
+# ✅ PHASE 1: INFRASTRUCTURE FOUNDATION | 第一階段：基礎設施建設
+
+## 🎯 **PHASE 1 OBJECTIVES | 第一階段目標**
+Build robust, scalable infrastructure for AI-powered forex trading system  
+建立穩健、可擴展的AI驅動外匯交易系統基礎設施
+
+## ✅ **COMPLETED COMPONENTS | 已完成組件**
+
+### 🏗️ **1. Environment & Project Setup | 環境與專案設置**
+- ✅ **Python Environment**: Python 3.8+ with virtual environment | Python 3.8+ 配合虛擬環境
+- ✅ **Project Structure**: AI/ML standard structure with proper module organization | AI/ML標準結構配合適當模組組織  
+- ✅ **Git Repository**: Version control with GitHub auto-backup | 版本控制配合GitHub自動備份
+- ✅ **Dependencies**: Core packages (pandas, numpy, yfinance, scikit-learn, matplotlib) | 核心套件
+
+### 📊 **2. Data Infrastructure | 數據基礎設施**
+- ✅ **Data Loader**: Forex data retrieval from Yahoo Finance with symbol conversion | 從Yahoo Finance取得外匯數據配合品種轉換
+- ✅ **Data Preprocessor**: OHLCV validation, feature engineering, outlier handling | OHLCV驗證、特徵工程、異常值處理
+- ✅ **Technical Indicators**: 30+ indicators (SMA, EMA, RSI, MACD, Bollinger Bands, ATR) | 30+技術指標
+- ✅ **Signal Generation**: Technical signal calculation and combination | 技術信號計算與組合
+
+### 🔧 **3. Core Utilities | 核心工具**
+- ✅ **Configuration System**: Multi-environment config with validation | 多環境配置配合驗證  
+- ✅ **Logging System**: Structured logging with trading event specialization | 結構化日誌配合交易事件專用化
+- ✅ **Error Handling**: Comprehensive error management and recovery | 全面錯誤管理與恢復
+
+### 🧪 **4. Testing & Validation | 測試與驗證**
+- ✅ **Unit Tests**: Component-level testing framework | 組件級測試框架
+- ✅ **Integration Tests**: End-to-end pipeline validation | 端到端管道驗證  
+- ✅ **Phase 1 Test Suite**: Comprehensive validation with 90%+ pass rate | 全面驗證，通過率90%+
+
+## 📈 **PHASE 1 ACHIEVEMENTS | 第一階段成就**
+- **Pass Rate**: 90%+ (Excellent) | 通過率90%+（優秀）
+- **Infrastructure Status**: Fully Functional | 基礎設施狀態：完全正常
+- **Technical Debt**: Zero - clean architecture maintained | 技術債務：零 - 維持乾淨架構
+- **Ready for Phase 2**: ✅ All prerequisites met | 準備第二階段：所有前置條件已滿足
+
+---
+
+# 🔄 PHASE 2: AI MODEL DEVELOPMENT | 第二階段：AI模型開發
+
+## 🎯 **PHASE 2 OBJECTIVES | 第二階段目標**
+Develop and train AI models for price direction prediction with high accuracy  
+開發並訓練價格方向預測的AI模型，實現高準確度
+
+## 📋 **PHASE 2 DETAILED PLAN | 第二階段詳細計劃**
+
+### 🧠 **2.1 Model Architecture Development | 模型架構開發**
+- [ ] **Base Model Framework** | 基礎模型框架
+  - [ ] Abstract base classes for all models | 所有模型的抽象基類
+  - [ ] Common interface for training/prediction | 訓練/預測的通用接口
+  - [ ] Model serialization and versioning | 模型序列化與版本控制
+  - [ ] Performance metrics standardization | 績效指標標準化
+
+### 🌲 **2.2 XGBoost Implementation | XGBoost實現**
+- [ ] **XGBoost Classifier** | XGBoost分類器
+  - [ ] Feature selection optimization | 特徵選擇優化
+  - [ ] Hyperparameter tuning with GridSearch/Optuna | 使用GridSearch/Optuna進行超參數調優
+  - [ ] Cross-validation framework | 交叉驗證框架
+  - [ ] Feature importance analysis | 特徵重要性分析
+
+### 🌳 **2.3 Random Forest Ensemble | 隨機森林集成**
+- [ ] **Random Forest Classifier** | 隨機森林分類器
+  - [ ] Ensemble optimization | 集成優化
+  - [ ] Out-of-bag scoring | 袋外評分
+  - [ ] Feature bootstrapping | 特徵自助抽樣
+  - [ ] Tree visualization and interpretation | 樹形可視化與解釋
+
+### 🧠 **2.4 LSTM Neural Networks | LSTM神經網路**
+- [ ] **LSTM Architecture** | LSTM架構
+  - [ ] Sequential model design for time series | 時間序列的序列模型設計
+  - [ ] Attention mechanism integration | 注意力機制整合
+  - [ ] Dropout and regularization | Dropout與正則化
+  - [ ] Learning rate scheduling | 學習率調度
+
+### 🎯 **2.5 Model Training Pipeline | 模型訓練管道**
+- [ ] **Training Infrastructure** | 訓練基礎設施
+  - [ ] Data preprocessing for ML models | ML模型的數據預處理
+  - [ ] Train/validation/test splitting | 訓練/驗證/測試分割
+  - [ ] Early stopping and checkpointing | 早期停止與檢查點
+  - [ ] Model comparison and selection | 模型比較與選擇
+
+### 📊 **2.6 Model Evaluation & Validation | 模型評估與驗證**
+- [ ] **Performance Metrics** | 績效指標
+  - [ ] Classification metrics (accuracy, precision, recall, F1) | 分類指標（準確度、精確度、召回率、F1）
+  - [ ] Trading-specific metrics (profit factor, Sharpe ratio) | 交易特定指標（獲利因子、夏普比率）
+  - [ ] Confusion matrix and ROC analysis | 混淆矩陣與ROC分析
+  - [ ] Backtesting integration | 回測整合
+
+### 🔧 **2.7 Model Management System | 模型管理系統**
+- [ ] **MLOps Infrastructure** | MLOps基礎設施
+  - [ ] Model registry and versioning | 模型註冊與版本控制
+  - [ ] Experiment tracking with MLflow/Weights & Biases | 使用MLflow/Weights & Biases進行實驗追踪
+  - [ ] Model deployment pipeline | 模型部署管道
+  - [ ] A/B testing framework | A/B測試框架
+
+## 📅 **PHASE 2 TIMELINE | 第二階段時間表**
+- **Duration | 持續時間**: 3-4 weeks | 3-4週
+- **Milestone 2.1**: Model architecture (Week 1) | 模型架構（第1週）
+- **Milestone 2.2**: XGBoost & Random Forest (Week 2) | XGBoost與隨機森林（第2週）  
+- **Milestone 2.3**: LSTM implementation (Week 3) | LSTM實現（第3週）
+- **Milestone 2.4**: Evaluation & validation (Week 4) | 評估與驗證（第4週）
+
+## ✅ **PHASE 2 SUCCESS CRITERIA | 第二階段成功標準**
+- **Model Accuracy**: >60% for price direction prediction | 模型準確度：價格方向預測>60%
+- **Model Diversity**: 3 different model types implemented | 模型多樣性：實現3種不同模型類型
+- **Validation**: Robust backtesting with multiple timeframes | 驗證：多時間框架的穩健回測
+- **Documentation**: Complete model documentation and usage | 文件：完整的模型文件與使用說明
+
+---
+
+# ⏳ PHASE 3: STRATEGY INTEGRATION | 第三階段：策略整合
+
+## 🎯 **PHASE 3 OBJECTIVES | 第三階段目標**
+Integrate AI models with trading strategy and risk management systems  
+將AI模型與交易策略和風險管理系統整合
+
+## 📋 **PHASE 3 DETAILED PLAN | 第三階段詳細計劃**
+
+### 🎯 **3.1 Signal Combination Engine | 信號組合引擎**
+- [ ] **Multi-Signal Integration** | 多信號整合
+  - [ ] AI model output combination | AI模型輸出組合
+  - [ ] Technical indicator signal fusion | 技術指標信號融合
+  - [ ] Confidence scoring system | 信心評分系統
+  - [ ] Signal weight optimization | 信號權重優化
+
+### 🛡️ **3.2 Risk Management System | 風險管理系統**
+- [ ] **Position Sizing** | 倉位大小
+  - [ ] Fixed percentage risk per trade | 每筆交易固定百分比風險
+  - [ ] Kelly Criterion implementation | 凱利公式實現
+  - [ ] Volatility-adjusted sizing | 波動性調整大小
+  - [ ] Maximum drawdown protection | 最大回撤保護
+
+- [ ] **Stop Loss & Take Profit** | 止損與止盈
+  - [ ] ATR-based stop levels | 基於ATR的止損水平
+  - [ ] Trailing stop implementation | 移動止損實現
+  - [ ] Dynamic profit targets | 動態獲利目標
+  - [ ] Risk-reward ratio optimization | 風險收益比優化
+
+### 📈 **3.3 Trading Strategy Engine | 交易策略引擎**
+- [ ] **Strategy Framework** | 策略框架
+  - [ ] Entry signal generation | 入場信號生成
+  - [ ] Exit condition management | 離場條件管理
+  - [ ] Position tracking system | 倉位追蹤系統
+  - [ ] Trade execution logic | 交易執行邏輯
+
+### 🧪 **3.4 Backtesting Framework | 回測框架**
+- [ ] **Comprehensive Backtesting** | 綜合回測
+  - [ ] Historical data simulation | 歷史數據模擬
+  - [ ] Transaction cost modeling | 交易成本建模
+  - [ ] Slippage and spread simulation | 滑點與價差模擬
+  - [ ] Performance analytics dashboard | 績效分析儀表板
+
+### 📊 **3.5 Performance Analytics | 績效分析**
+- [ ] **Trading Metrics** | 交易指標
+  - [ ] Profit factor and win rate | 獲利因子與勝率
+  - [ ] Sharpe and Sortino ratios | 夏普與索提諾比率
+  - [ ] Maximum drawdown analysis | 最大回撤分析
+  - [ ] Risk-adjusted returns | 風險調整回報
+
+## 📅 **PHASE 3 TIMELINE | 第三階段時間表**
+- **Duration | 持續時間**: 2-3 weeks | 2-3週
+- **Milestone 3.1**: Signal integration (Week 1) | 信號整合（第1週）
+- **Milestone 3.2**: Risk management (Week 2) | 風險管理（第2週）
+- **Milestone 3.3**: Strategy validation (Week 3) | 策略驗證（第3週）
+
+---
+
+# ⏳ PHASE 4: PRODUCTION DEPLOYMENT | 第四階段：生產部署
+
+## 🎯 **PHASE 4 OBJECTIVES | 第四階段目標**
+Deploy trading system for live market operation with monitoring and maintenance  
+部署交易系統進行實盤市場運作，配合監控與維護
+
+## 📋 **PHASE 4 DETAILED PLAN | 第四階段詳細計劃**
+
+### 🏗️ **4.1 Production Infrastructure | 生產基礎設施**
+- [ ] **System Architecture** | 系統架構
+  - [ ] Containerization with Docker | 使用Docker容器化
+  - [ ] Cloud deployment (AWS/GCP/Azure) | 雲端部署
+  - [ ] Load balancing and scaling | 負載均衡與擴展
+  - [ ] Database optimization | 資料庫優化
+
+### 📡 **4.2 Real-time Data Pipeline | 即時數據管道**
+- [ ] **Live Data Integration** | 即時數據整合
+  - [ ] Real-time forex data feeds | 即時外匯數據源
+  - [ ] Data quality monitoring | 數據品質監控
+  - [ ] Latency optimization | 延遲優化
+  - [ ] Data backup and recovery | 數據備份與恢復
+
+### 🤖 **4.3 Trading Automation | 交易自動化**
+- [ ] **Execution System** | 執行系統
+  - [ ] Broker API integration | 券商API整合
+  - [ ] Order management system | 訂單管理系統
+  - [ ] Trade execution monitoring | 交易執行監控
+  - [ ] Error handling and recovery | 錯誤處理與恢復
+
+### 📊 **4.4 Monitoring & Alerting | 監控與警報**
+- [ ] **System Monitoring** | 系統監控
+  - [ ] Performance metrics dashboard | 績效指標儀表板
+  - [ ] Health check automation | 健康檢查自動化
+  - [ ] Alert system for anomalies | 異常警報系統
+  - [ ] Log aggregation and analysis | 日誌聚合與分析
+
+### 🔧 **4.5 Maintenance & Updates | 維護與更新**
+- [ ] **System Maintenance** | 系統維護
+  - [ ] Model retraining pipeline | 模型重新訓練管道
+  - [ ] Strategy parameter optimization | 策略參數優化
+  - [ ] Performance review and adjustment | 績效審查與調整
+  - [ ] System security updates | 系統安全更新
+
+## 📅 **PHASE 4 TIMELINE | 第四階段時間表**
+- **Duration | 持續時間**: 3-4 weeks | 3-4週
+- **Milestone 4.1**: Infrastructure setup (Week 1-2) | 基礎設施設置（第1-2週）
+- **Milestone 4.2**: Live integration (Week 3) | 即時整合（第3週）
+- **Milestone 4.3**: Production deployment (Week 4) | 生產部署（第4週）
+
+---
+
+# 📊 PROJECT MANAGEMENT | 專案管理
+
+## 🎯 **DEVELOPMENT PRINCIPLES | 開發原則**
+1. **Test-Driven Development** | 測試驅動開發
+2. **Continuous Integration** | 持續整合
+3. **Documentation-First** | 文件優先
+4. **Clean Architecture** | 乾淨架構
+5. **Risk Management** | 風險管理
+
+## 📈 **SUCCESS METRICS | 成功指標**
+- **Code Quality**: 90%+ test coverage | 代碼品質：90%+測試覆蓋率
+- **Performance**: <100ms inference time | 性能：<100ms推理時間
+- **Accuracy**: >60% prediction accuracy | 準確度：>60%預測準確度
+- **Reliability**: 99.9% uptime in production | 可靠性：生產環境99.9%正常運行時間
+
+## 🔄 **CONTINUOUS IMPROVEMENT | 持續改進**
+- **Weekly Reviews**: Progress assessment and adjustment | 週度檢討：進度評估與調整
+- **Monthly Optimization**: Model and strategy refinement | 月度優化：模型與策略改進
+- **Quarterly Planning**: Strategic direction review | 季度規劃：戰略方向檢討
+
+---
+
+# 🚨 PHASE TRANSITION RULES | 階段轉換規則
+
+## ✅ **PHASE COMPLETION CRITERIA | 階段完成標準**
+
+### Phase 1 → Phase 2 Transition | 第一階段→第二階段轉換
+- [x] **Infrastructure**: 90%+ test pass rate | 基礎設施：90%+測試通過率
+- [x] **Technical Debt**: Zero technical debt | 技術債務：零技術債務  
+- [x] **Documentation**: Complete phase documentation | 文件：完整階段文件
+
+### Phase 2 → Phase 3 Transition | 第二階段→第三階段轉換
+- [ ] **Models**: 3 AI models implemented and validated | 模型：3個AI模型實現並驗證
+- [ ] **Accuracy**: >60% prediction accuracy achieved | 準確度：達到>60%預測準確度
+- [ ] **Testing**: Comprehensive model testing completed | 測試：完成全面模型測試
+
+### Phase 3 → Phase 4 Transition | 第三階段→第四階段轉換  
+- [ ] **Integration**: Full strategy integration completed | 整合：完成完整策略整合
+- [ ] **Backtesting**: Positive backtesting results | 回測：正面回測結果
+- [ ] **Risk Management**: Comprehensive risk controls | 風險管理：全面風險控制
+
+## 🔄 **CURRENT STATUS | 當前狀態**
+- **Active Phase**: Phase 1 ✅ COMPLETED → Ready for Phase 2 | 活躍階段：第一階段已完成→準備第二階段
+- **Next Action**: Begin Phase 2 AI Model Development | 下一步行動：開始第二階段AI模型開發
+- **Prerequisites**: All Phase 1 requirements satisfied | 前置條件：所有第一階段要求已滿足
+
+---
+
+**🎯 This roadmap serves as the single source of truth for AIFX development progression.**  
+**📈 Claude Code must reference and update this roadmap throughout development.**  
+**⚡ Each phase must be completed before proceeding to the next phase.**
+
+**🎯 此路線圖作為AIFX開發進度的唯一真實來源。**  
+**📈 Claude Code必須在整個開發過程中參考和更新此路線圖。**  
+**⚡ 必須完成每個階段才能進入下一階段。**
