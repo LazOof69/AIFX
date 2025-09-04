@@ -1,0 +1,518 @@
+# AIFX - AWS Load Balancer Controller Configuration
+# AIFX - AWS負載均衡器控制器配置
+
+---
+# ServiceAccount for AWS Load Balancer Controller | AWS負載均衡器控制器的服務帳戶
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aws-load-balancer-controller
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/instance: aws-load-balancer-controller
+    app.kubernetes.io/component: controller
+    environment: production
+  annotations:
+    description: "Service account for AWS Load Balancer Controller | AWS負載均衡器控制器的服務帳戶"
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/AmazonEKSLoadBalancerControllerRole  # Replace with actual role ARN
+
+---
+# ClusterRole for AWS Load Balancer Controller | AWS負載均衡器控制器的叢集角色
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aws-load-balancer-controller
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    environment: production
+rules:
+- apiGroups: ["", "extensions"]
+  resources: ["configmaps"]
+  verbs: ["create"]
+- apiGroups: ["", "extensions"]
+  resources: ["configmaps"]
+  resourceNames: ["aws-load-balancer-controller-leader"]
+  verbs: ["get", "update"]
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "patch", "update", "watch"]
+- apiGroups: [""]
+  resources: ["services/status"]
+  verbs: ["patch", "update"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "patch", "update", "watch"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses/status"]
+  verbs: ["patch", "update"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingressclasses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["elbv2.k8s.aws"]
+  resources: ["targetgroupbindings"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["elbv2.k8s.aws"]
+  resources: ["targetgroupbindings/status"]
+  verbs: ["patch", "update"]
+
+---
+# ClusterRoleBinding for AWS Load Balancer Controller | AWS負載均衡器控制器的叢集角色綁定
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aws-load-balancer-controller
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    environment: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aws-load-balancer-controller
+subjects:
+- kind: ServiceAccount
+  name: aws-load-balancer-controller
+  namespace: kube-system
+
+---
+# Role for leader election | 領導者選舉的角色
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: aws-load-balancer-controller-leader-election
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    environment: production
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["aws-load-balancer-controller-leader"]
+  verbs: ["get", "update", "patch"]
+
+---
+# RoleBinding for leader election | 領導者選舉的角色綁定
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: aws-load-balancer-controller-leader-election
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    environment: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: aws-load-balancer-controller-leader-election
+subjects:
+- kind: ServiceAccount
+  name: aws-load-balancer-controller
+  namespace: kube-system
+
+---
+# AWS Load Balancer Controller Deployment | AWS負載均衡器控制器部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aws-load-balancer-controller
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/instance: aws-load-balancer-controller
+    app.kubernetes.io/version: "2.6.0"
+    app.kubernetes.io/component: controller
+    environment: production
+  annotations:
+    description: "AWS Load Balancer Controller for EKS cluster | EKS叢集的AWS負載均衡器控制器"
+spec:
+  replicas: 2  # High availability | 高可用性
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aws-load-balancer-controller
+      app.kubernetes.io/instance: aws-load-balancer-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aws-load-balancer-controller
+        app.kubernetes.io/instance: aws-load-balancer-controller
+        app.kubernetes.io/component: controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: aws-load-balancer-controller
+      securityContext:
+        fsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: controller
+        image: amazon/aws-load-balancer-controller:v2.6.0
+        imagePullPolicy: IfNotPresent
+        
+        args:
+        # Cluster configuration | 叢集配置
+        - --cluster-name=aifx-production  # Replace with actual cluster name | 請替換為實際叢集名稱
+        - --ingress-class=alb
+        
+        # AWS configuration | AWS配置
+        - --aws-region=us-west-2  # Replace with actual region | 請替換為實際區域
+        - --aws-vpc-id=vpc-XXXXXXXXX  # Replace with actual VPC ID | 請替換為實際VPC ID
+        
+        # Performance and reliability | 性能和可靠性
+        - --webhook-bind-port=9443
+        - --metrics-bind-addr=:8080
+        - --health-probe-bind-addr=:8081
+        - --sync-period=1m
+        - --watch-namespace=  # Watch all namespaces | 監視所有命名空間
+        
+        # Feature gates | 功能閘道
+        - --feature-gates=wafv2=true,shield=true,gwlb=true
+        
+        # Leader election | 領導者選舉
+        - --enable-leader-election=true
+        - --leader-election-id=aws-load-balancer-controller-leader
+        
+        # Logging | 日誌記錄
+        - --log-level=info
+        - --zap-log-level=info
+        
+        env:
+        - name: AWS_REGION
+          value: "us-west-2"  # Replace with actual region | 請替換為實際區域
+        - name: AWS_DEFAULT_REGION
+          value: "us-west-2"
+        - name: CLUSTER_NAME
+          value: "aifx-production"  # Replace with actual cluster name | 請替換為實際叢集名稱
+        
+        ports:
+        - name: webhook-server
+          containerPort: 9443
+          protocol: TCP
+        - name: metrics-server
+          containerPort: 8080
+          protocol: TCP
+        - name: health-probe
+          containerPort: 8081
+          protocol: TCP
+        
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health-probe
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+          periodSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: health-probe
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 10
+          failureThreshold: 3
+        
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+          limits:
+            cpu: 200m
+            memory: 500Mi
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          seccompProfile:
+            type: RuntimeDefault
+        
+        volumeMounts:
+        - name: cert
+          mountPath: /tmp/k8s-webhook-server/serving-certs
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: aws-load-balancer-webhook-tls
+      - name: tmp
+        emptyDir: {}
+      
+      nodeSelector:
+        kubernetes.io/os: linux
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - aws-load-balancer-controller
+              topologyKey: kubernetes.io/hostname
+      
+      tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "system"
+        effect: "NoSchedule"
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoExecute
+        key: node.kubernetes.io/not-ready
+        operator: Exists
+        tolerationSeconds: 300
+      - effect: NoExecute
+        key: node.kubernetes.io/unreachable
+        operator: Exists
+        tolerationSeconds: 300
+
+---
+# Service for AWS Load Balancer Controller webhooks | AWS負載均衡器控制器webhook的服務
+apiVersion: v1
+kind: Service
+metadata:
+  name: aws-load-balancer-webhook-service
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/component: webhook
+spec:
+  type: ClusterIP
+  ports:
+  - name: webhook-server
+    port: 443
+    targetPort: webhook-server
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/instance: aws-load-balancer-controller
+
+---
+# Service for metrics | 指標的服務
+apiVersion: v1
+kind: Service
+metadata:
+  name: aws-load-balancer-controller-metrics
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/component: metrics
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 8080
+    targetPort: metrics-server
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/instance: aws-load-balancer-controller
+
+---
+# ValidatingAdmissionWebhook | 驗證准入Webhook
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionWebhook
+metadata:
+  name: aws-load-balancer-webhook
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+  annotations:
+    cert-manager.io/inject-ca-from: kube-system/aws-load-balancer-serving-cert
+webhooks:
+- name: vingress.elbv2.k8s.aws
+  clientConfig:
+    service:
+      name: aws-load-balancer-webhook-service
+      namespace: kube-system
+      path: /validate-networking-v1-ingress
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["networking.k8s.io"]
+    apiVersions: ["v1"]
+    resources: ["ingresses"]
+  admissionReviewVersions: ["v1beta1", "v1"]
+  sideEffects: None
+  failurePolicy: Fail
+- name: vtargetgroupbinding.elbv2.k8s.aws
+  clientConfig:
+    service:
+      name: aws-load-balancer-webhook-service
+      namespace: kube-system
+      path: /validate-elbv2-k8s-aws-v1beta1-targetgroupbinding
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["elbv2.k8s.aws"]
+    apiVersions: ["v1beta1"]
+    resources: ["targetgroupbindings"]
+  admissionReviewVersions: ["v1beta1", "v1"]
+  sideEffects: None
+  failurePolicy: Fail
+
+---
+# MutatingAdmissionWebhook | 變更准入Webhook
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionWebhook
+metadata:
+  name: aws-load-balancer-webhook
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+  annotations:
+    cert-manager.io/inject-ca-from: kube-system/aws-load-balancer-serving-cert
+webhooks:
+- name: mingress.elbv2.k8s.aws
+  clientConfig:
+    service:
+      name: aws-load-balancer-webhook-service
+      namespace: kube-system
+      path: /mutate-networking-v1-ingress
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["networking.k8s.io"]
+    apiVersions: ["v1"]
+    resources: ["ingresses"]
+  admissionReviewVersions: ["v1beta1", "v1"]
+  sideEffects: None
+  failurePolicy: Fail
+- name: mtargetgroupbinding.elbv2.k8s.aws
+  clientConfig:
+    service:
+      name: aws-load-balancer-webhook-service
+      namespace: kube-system
+      path: /mutate-elbv2-k8s-aws-v1beta1-targetgroupbinding
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["elbv2.k8s.aws"]
+    apiVersions: ["v1beta1"]
+    resources: ["targetgroupbindings"]
+  admissionReviewVersions: ["v1beta1", "v1"]
+  sideEffects: None
+  failurePolicy: Fail
+- name: mpod.elbv2.k8s.aws
+  clientConfig:
+    service:
+      name: aws-load-balancer-webhook-service
+      namespace: kube-system
+      path: /mutate-v1-pod
+  rules:
+  - operations: ["CREATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+  admissionReviewVersions: ["v1beta1", "v1"]
+  sideEffects: None
+  failurePolicy: Fail
+
+---
+# Certificate for webhook TLS | Webhook TLS的證書
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: aws-load-balancer-serving-cert
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+spec:
+  dnsNames:
+  - aws-load-balancer-webhook-service.kube-system.svc
+  - aws-load-balancer-webhook-service.kube-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: aws-load-balancer-selfsigned-issuer
+  secretName: aws-load-balancer-webhook-tls
+  subject:
+    organizationalUnits:
+    - aws-load-balancer-controller
+
+---
+# Self-signed issuer for webhook certificates | Webhook證書的自簽名發行者
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: aws-load-balancer-selfsigned-issuer
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+spec:
+  selfSigned: {}
+
+---
+# ServiceMonitor for Prometheus | Prometheus的ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: aws-load-balancer-controller
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aws-load-balancer-controller
+      app.kubernetes.io/component: metrics
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+
+---
+# IngressClass for AWS Load Balancer Controller | AWS負載均衡器控制器的IngressClass
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: alb
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "false"
+spec:
+  controller: ingress.k8s.aws/alb

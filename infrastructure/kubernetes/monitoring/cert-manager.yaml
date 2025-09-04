@@ -1,0 +1,324 @@
+# AIFX - Cert-Manager Configuration for SSL/TLS
+# AIFX - SSL/TLS的Cert-Manager配置
+
+---
+# ClusterIssuer for Let's Encrypt Production | Let's Encrypt生產環境的ClusterIssuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production
+  labels:
+    app: cert-manager
+    component: cluster-issuer
+    environment: production
+  annotations:
+    description: "Let's Encrypt production issuer for AIFX SSL certificates | AIFX SSL證書的Let's Encrypt生產環境發行者"
+spec:
+  acme:
+    # Let's Encrypt production server | Let's Encrypt生產伺服器
+    server: https://acme-v02.api.letsencrypt.org/directory
+    
+    # Email for certificate notifications | 證書通知的電子郵件
+    email: admin@example.com  # Replace with actual email | 請替換為實際電子郵件
+    
+    # Private key for ACME account | ACME帳戶的私鑰
+    privateKeySecretRef:
+      name: letsencrypt-production-private-key
+    
+    # Solvers for ACME challenges | ACME挑戰的求解器
+    solvers:
+    # HTTP-01 challenge solver | HTTP-01挑戰求解器
+    - http01:
+        ingress:
+          class: nginx
+          podTemplate:
+            metadata:
+              annotations:
+                prometheus.io/scrape: "false"
+            spec:
+              tolerations:
+              - key: "dedicated"
+                operator: "Equal"
+                value: "system"
+                effect: "NoSchedule"
+              nodeSelector:
+                kubernetes.io/os: linux
+      selector:
+        dnsNames:
+        - "aifx.example.com"
+        - "api.aifx.example.com"
+    
+    # DNS-01 challenge solver for wildcard certificates | 通配符證書的DNS-01挑戰求解器
+    - dns01:
+        route53:
+          region: us-west-2
+          accessKeyID: AKIAIOSFODNN7EXAMPLE  # Replace with actual access key | 請替換為實際訪問金鑰
+          secretAccessKeySecretRef:
+            name: route53-credentials
+            key: secret-access-key
+      selector:
+        dnsNames:
+        - "*.aifx.example.com"
+
+---
+# ClusterIssuer for Let's Encrypt Staging | Let's Encrypt測試環境的ClusterIssuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+  labels:
+    app: cert-manager
+    component: cluster-issuer
+    environment: staging
+  annotations:
+    description: "Let's Encrypt staging issuer for testing | 用於測試的Let's Encrypt測試環境發行者"
+spec:
+  acme:
+    # Let's Encrypt staging server | Let's Encrypt測試伺服器
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    
+    # Email for certificate notifications | 證書通知的電子郵件
+    email: admin@example.com  # Replace with actual email | 請替換為實際電子郵件
+    
+    # Private key for ACME account | ACME帳戶的私鑰
+    privateKeySecretRef:
+      name: letsencrypt-staging-private-key
+    
+    # HTTP-01 challenge solver | HTTP-01挑戰求解器
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+
+---
+# Certificate for AIFX main domain | AIFX主域名的證書
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: aifx-tls-certificate
+  namespace: aifx
+  labels:
+    app: aifx-app
+    component: certificate
+    environment: production
+  annotations:
+    description: "TLS certificate for AIFX main application | AIFX主應用程式的TLS證書"
+spec:
+  # Certificate secret name | 證書密鑰名稱
+  secretName: aifx-tls-secret
+  
+  # Issuer reference | 發行者參考
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+    group: cert-manager.io
+  
+  # Common name | 通用名稱
+  commonName: aifx.example.com
+  
+  # Subject alternative names | 主題備用名稱
+  dnsNames:
+  - aifx.example.com
+  - api.aifx.example.com
+  - www.aifx.example.com
+  
+  # Certificate duration and renewal | 證書持續時間和續期
+  duration: 2160h    # 90 days | 90天
+  renewBefore: 360h  # 15 days before expiry | 到期前15天
+
+---
+# Certificate for monitoring services | 監控服務的證書
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: aifx-monitoring-tls-certificate
+  namespace: monitoring
+  labels:
+    app: monitoring
+    component: certificate
+    environment: production
+  annotations:
+    description: "TLS certificate for AIFX monitoring services | AIFX監控服務的TLS證書"
+spec:
+  # Certificate secret name | 證書密鑰名稱
+  secretName: aifx-monitoring-tls-secret
+  
+  # Issuer reference | 發行者參考
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+    group: cert-manager.io
+  
+  # Common name | 通用名稱
+  commonName: grafana.aifx.example.com
+  
+  # Subject alternative names | 主題備用名稱
+  dnsNames:
+  - grafana.aifx.example.com
+  - prometheus.aifx.example.com
+  - kibana.aifx.example.com
+  - alertmanager.aifx.example.com
+  
+  # Certificate duration and renewal | 證書持續時間和續期
+  duration: 2160h    # 90 days | 90天
+  renewBefore: 360h  # 15 days before expiry | 到期前15天
+
+---
+# Route53 credentials secret template | Route53憑證密鑰模板
+apiVersion: v1
+kind: Secret
+metadata:
+  name: route53-credentials
+  namespace: cert-manager
+  labels:
+    app: cert-manager
+    component: route53-credentials
+  annotations:
+    description: "AWS Route53 credentials for DNS-01 challenges | DNS-01挑戰的AWS Route53憑證"
+type: Opaque
+data:
+  # Replace with actual base64 encoded AWS secret access key
+  # 請替換為實際的base64編碼AWS秘密訪問金鑰
+  secret-access-key: <BASE64_ENCODED_AWS_SECRET_ACCESS_KEY>
+
+---
+# Cert-Manager webhook configuration | Cert-Manager webhook配置
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionWebhook
+metadata:
+  name: cert-manager-webhook
+  labels:
+    app: webhook
+    app.kubernetes.io/name: webhook
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: webhook
+  annotations:
+    cert-manager.io/inject-ca-from: "cert-manager/cert-manager-webhook-ca"
+webhooks:
+- name: webhook.cert-manager.io
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["cert-manager.io"]
+    apiVersions: ["v1"]
+    resources: ["*/*"]
+  clientConfig:
+    service:
+      name: cert-manager-webhook
+      namespace: cert-manager
+      path: /mutate
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
+  failurePolicy: Fail
+
+---
+# Certificate monitoring and alerting | 證書監控和警報
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cert-manager-metrics
+  namespace: cert-manager
+  labels:
+    app: cert-manager
+    component: metrics
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+      app.kubernetes.io/component: controller
+  endpoints:
+  - port: http-metrics
+    interval: 30s
+    path: /metrics
+
+---
+# PrometheusRule for certificate monitoring | 證書監控的PrometheusRule
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cert-manager-alerts
+  namespace: cert-manager
+  labels:
+    app: cert-manager
+    component: alerts
+spec:
+  groups:
+  - name: cert-manager.rules
+    rules:
+    # Certificate expiry alert | 證書到期警報
+    - alert: CertificateExpiry
+      expr: certmanager_certificate_expiration_timestamp_seconds - time() < 7 * 24 * 3600
+      for: 1h
+      labels:
+        severity: warning
+        service: cert-manager
+      annotations:
+        summary: "Certificate {{ $labels.name }} is expiring soon"
+        description: "Certificate {{ $labels.name }} in namespace {{ $labels.namespace }} will expire in less than 7 days"
+    
+    # Certificate renewal failure | 證書續期失敗
+    - alert: CertificateRenewalFailure
+      expr: certmanager_certificate_ready_status{condition="False"} == 1
+      for: 15m
+      labels:
+        severity: critical
+        service: cert-manager
+      annotations:
+        summary: "Certificate {{ $labels.name }} renewal failed"
+        description: "Certificate {{ $labels.name }} in namespace {{ $labels.namespace }} failed to renew"
+    
+    # ACME challenge failure | ACME挑戰失敗
+    - alert: ACMEChallengeFailure
+      expr: increase(certmanager_acme_client_request_count{status!="200"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+        service: cert-manager
+      annotations:
+        summary: "ACME challenge failed"
+        description: "ACME challenge failed with status {{ $labels.status }}"
+
+---
+# ConfigMap for cert-manager configuration | Cert-manager配置的ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cert-manager-config
+  namespace: cert-manager
+  labels:
+    app: cert-manager
+    component: configuration
+data:
+  # Cert-manager controller configuration | Cert-manager控制器配置
+  controller-config.yaml: |
+    apiVersion: controller.config.cert-manager.io/v1alpha1
+    kind: ControllerConfiguration
+    metadata:
+      name: cert-manager-controller
+    
+    # Logging configuration | 日誌配置
+    logging:
+      verbosity: 2
+      format: text
+    
+    # Leader election | 領導者選舉
+    leaderElection:
+      enabled: true
+      namespace: cert-manager
+    
+    # Kubernetes API configuration | Kubernetes API配置
+    kubernetesAPIQPS: 20
+    kubernetesAPIBurst: 50
+    
+    # Certificate configuration | 證書配置
+    clusterResourceNamespace: cert-manager
+    namespace: cert-manager
+    
+    # Webhook configuration | Webhook配置
+    webhook:
+      securePort: 10250
+      healthzPort: 6080
+    
+    # Metrics configuration | 指標配置
+    metrics:
+      enabled: true
+      address: "0.0.0.0:9402"

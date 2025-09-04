@@ -1,0 +1,357 @@
+# AIFX - External DNS Configuration for Automatic DNS Management
+# AIFX - 自動DNS管理的External DNS配置
+
+---
+# ServiceAccount for External DNS | External DNS的服務帳戶
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-dns
+  namespace: kube-system-addons
+  labels:
+    app: external-dns
+    app.kubernetes.io/name: external-dns
+    app.kubernetes.io/instance: external-dns
+    app.kubernetes.io/component: dns-controller
+    environment: production
+  annotations:
+    description: "Service account for External DNS controller | External DNS控制器的服務帳戶"
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/external-dns-role  # Replace with actual role ARN
+
+---
+# ClusterRole for External DNS | External DNS的叢集角色
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-dns
+  labels:
+    app: external-dns
+    environment: production
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints", "pods"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["list", "watch"]
+
+---
+# ClusterRoleBinding for External DNS | External DNS的叢集角色綁定
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-dns-viewer
+  labels:
+    app: external-dns
+    environment: production
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-dns
+subjects:
+- kind: ServiceAccount
+  name: external-dns
+  namespace: kube-system-addons
+
+---
+# External DNS Deployment | External DNS部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+  namespace: kube-system-addons
+  labels:
+    app: external-dns
+    app.kubernetes.io/name: external-dns
+    app.kubernetes.io/instance: external-dns
+    app.kubernetes.io/version: "0.13.6"
+    app.kubernetes.io/component: dns-controller
+    environment: production
+  annotations:
+    description: "External DNS controller for automatic DNS management | 自動DNS管理的External DNS控制器"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Ensure only one instance runs at a time | 確保一次只運行一個實例
+  selector:
+    matchLabels:
+      app: external-dns
+  template:
+    metadata:
+      labels:
+        app: external-dns
+        app.kubernetes.io/name: external-dns
+        app.kubernetes.io/instance: external-dns
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7979"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: external-dns
+      securityContext:
+        fsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: external-dns
+        image: k8s.gcr.io/external-dns/external-dns:v0.13.6
+        imagePullPolicy: IfNotPresent
+        
+        args:
+        # Provider configuration | 提供者配置
+        - --source=service
+        - --source=ingress
+        - --provider=aws
+        
+        # Domain filtering | 域名過濾
+        - --domain-filter=aifx.example.com  # Replace with actual domain | 請替換為實際域名
+        - --zone-id-filter=Z1EXAMPLE123456  # Replace with actual Zone ID | 請替換為實際Zone ID
+        
+        # AWS specific settings | AWS特定設定
+        - --aws-zone-type=public
+        - --aws-prefer-cname
+        
+        # Policy and registry | 策略和註冊表
+        - --policy=upsert-only
+        - --registry=txt
+        - --txt-owner-id=aifx-external-dns
+        - --txt-prefix=external-dns-
+        
+        # Interval and logging | 間隔和日誌記錄
+        - --interval=1m
+        - --log-format=text
+        - --log-level=info
+        
+        # Metrics and monitoring | 指標和監控
+        - --metrics-address=0.0.0.0:7979
+        - --events
+        
+        # Annotation filters | 註解過濾器
+        - --annotation-filter=external-dns.alpha.kubernetes.io/hostname
+        
+        env:
+        # AWS configuration | AWS配置
+        - name: AWS_REGION
+          value: "us-west-2"  # Replace with actual region | 請替換為實際區域
+        - name: AWS_DEFAULT_REGION
+          value: "us-west-2"
+        
+        ports:
+        - name: http-metrics
+          containerPort: 7979
+          protocol: TCP
+        
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http-metrics
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 2
+          successThreshold: 1
+        
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http-metrics
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+          successThreshold: 1
+        
+        resources:
+          requests:
+            cpu: 50m
+            memory: 50Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          seccompProfile:
+            type: RuntimeDefault
+      
+      nodeSelector:
+        kubernetes.io/os: linux
+      
+      tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "system"
+        effect: "NoSchedule"
+
+---
+# Service for External DNS metrics | External DNS指標的服務
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-dns-metrics
+  namespace: kube-system-addons
+  labels:
+    app: external-dns
+    component: metrics
+    environment: production
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "7979"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http-metrics
+    port: 7979
+    targetPort: http-metrics
+    protocol: TCP
+  selector:
+    app: external-dns
+
+---
+# ServiceMonitor for Prometheus | Prometheus的ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: external-dns
+  namespace: kube-system-addons
+  labels:
+    app: external-dns
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: external-dns
+      component: metrics
+  endpoints:
+  - port: http-metrics
+    interval: 30s
+    path: /metrics
+
+---
+# PrometheusRule for External DNS alerts | External DNS警報的PrometheusRule
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: external-dns-alerts
+  namespace: kube-system-addons
+  labels:
+    app: external-dns
+    component: alerts
+spec:
+  groups:
+  - name: external-dns.rules
+    rules:
+    # External DNS not running | External DNS未運行
+    - alert: ExternalDNSDown
+      expr: up{job="external-dns"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: external-dns
+      annotations:
+        summary: "External DNS is down"
+        description: "External DNS has been down for more than 5 minutes"
+    
+    # DNS record synchronization errors | DNS記錄同步錯誤
+    - alert: ExternalDNSSyncErrors
+      expr: increase(external_dns_registry_errors_total[5m]) > 0
+      for: 2m
+      labels:
+        severity: warning
+        service: external-dns
+      annotations:
+        summary: "External DNS sync errors detected"
+        description: "External DNS encountered {{ $value }} sync errors in the last 5 minutes"
+    
+    # High DNS API rate limiting | 高DNS API速率限制
+    - alert: ExternalDNSHighAPIUsage
+      expr: rate(external_dns_http_request_total[5m]) > 10
+      for: 10m
+      labels:
+        severity: warning
+        service: external-dns
+      annotations:
+        summary: "External DNS high API usage"
+        description: "External DNS is making {{ $value }} API requests per second, which may indicate rate limiting"
+
+---
+# ConfigMap for External DNS configuration | External DNS配置的ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: external-dns-config
+  namespace: kube-system-addons
+  labels:
+    app: external-dns
+    component: configuration
+data:
+  # Configuration for different environments | 不同環境的配置
+  external-dns.yaml: |
+    # External DNS Configuration | External DNS配置
+    provider: aws
+    domainFilters:
+      - aifx.example.com
+    
+    # AWS Route53 specific settings | AWS Route53特定設定
+    aws:
+      zoneType: public
+      preferCNAME: true
+      evaluateTargetHealth: true
+      
+    # Policy settings | 策略設定
+    policy: upsert-only
+    registry: txt
+    txtOwnerId: aifx-external-dns
+    txtPrefix: external-dns-
+    
+    # Interval and batch settings | 間隔和批次設定
+    interval: 1m
+    minEventSyncInterval: 5s
+    
+    # Logging configuration | 日誌配置
+    logLevel: info
+    logFormat: text
+    
+    # Metrics configuration | 指標配置
+    metricsAddress: 0.0.0.0:7979
+    
+    # Source configuration | 源配置
+    sources:
+      - service
+      - ingress
+    
+    # Annotation filters | 註解過濾器
+    annotationFilter: external-dns.alpha.kubernetes.io/hostname
+
+  # DNS record templates | DNS記錄模板
+  dns-templates.yaml: |
+    # Example DNS records that External DNS will manage
+    # External DNS將管理的DNS記錄示例
+    
+    # Main application | 主要應用程式
+    aifx.example.com -> LoadBalancer IP
+    api.aifx.example.com -> LoadBalancer IP
+    www.aifx.example.com -> CNAME to aifx.example.com
+    
+    # Monitoring services | 監控服務
+    grafana.aifx.example.com -> LoadBalancer IP
+    prometheus.aifx.example.com -> LoadBalancer IP
+    kibana.aifx.example.com -> LoadBalancer IP
+    
+    # Additional subdomains | 額外子域名
+    admin.aifx.example.com -> LoadBalancer IP
+    docs.aifx.example.com -> LoadBalancer IP

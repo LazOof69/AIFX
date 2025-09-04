@@ -1,0 +1,391 @@
+# AIFX - ConfigMaps Configuration
+# AIFX - 配置映射檔案
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aifx-config
+  namespace: aifx
+  labels:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/version: "4.0.0"
+    app.kubernetes.io/component: configuration
+    app.kubernetes.io/part-of: aifx-trading-system
+    environment: production
+  annotations:
+    description: "AIFX application configuration settings | AIFX應用程式配置設定"
+data:
+  # Application Configuration | 應用程式配置
+  AIFX_ENV: "production"
+  LOG_LEVEL: "INFO"
+  DEBUG: "false"
+  
+  # Server Configuration | 伺服器配置
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  WORKERS: "4"
+  
+  # Trading Configuration | 交易配置
+  TRADING_PAIRS: "EURUSD,USDJPY"
+  TIMEFRAME: "1H"
+  
+  # AI Model Configuration | AI模型配置
+  MODEL_INFERENCE_TIMEOUT: "30"
+  MODEL_BATCH_SIZE: "32"
+  MODEL_CACHE_SIZE: "1000"
+  
+  # Performance Configuration | 性能配置
+  CONNECTION_POOL_SIZE: "20"
+  REQUEST_TIMEOUT: "60"
+  RETRY_ATTEMPTS: "3"
+  
+  # Feature Flags | 功能標誌
+  ENABLE_REAL_TIME_DATA: "true"
+  ENABLE_AI_MODELS: "true"
+  ENABLE_BACKTESTING: "true"
+  ENABLE_METRICS: "true"
+  ENABLE_HEALTH_CHECKS: "true"
+  
+  # Scaling Configuration | 擴展配置
+  MIN_REPLICAS: "3"
+  MAX_REPLICAS: "20"
+  CPU_THRESHOLD: "70"
+  MEMORY_THRESHOLD: "80"
+  
+  # Application Configuration File | 應用程式配置檔案
+  app-config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 8000
+      workers: 4
+      timeout: 60
+      keepalive: 2
+    
+    trading:
+      pairs:
+        - "EURUSD"
+        - "USDJPY"
+      timeframe: "1H"
+      signal_threshold: 0.6
+      risk_per_trade: 0.02
+      max_positions: 5
+    
+    ai_models:
+      xgboost:
+        enabled: true
+        timeout: 30
+        batch_size: 32
+      random_forest:
+        enabled: true
+        timeout: 30
+        batch_size: 32
+      lstm:
+        enabled: true
+        timeout: 60
+        batch_size: 16
+    
+    database:
+      connection_pool_size: 20
+      timeout: 30
+      retry_attempts: 3
+    
+    cache:
+      ttl: 3600
+      max_size: 1000
+    
+    monitoring:
+      enable_metrics: true
+      metrics_port: 8001
+      health_check_interval: 30
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: aifx
+  labels:
+    app: nginx
+    component: configuration
+    environment: production
+  annotations:
+    description: "Nginx load balancer configuration | Nginx負載均衡器配置"
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        # Logging Configuration | 日誌配置
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for" '
+                        'rt=$request_time uct="$upstream_connect_time" '
+                        'uht="$upstream_header_time" urt="$upstream_response_time"';
+        
+        access_log /var/log/nginx/access.log main;
+        
+        # Performance Settings | 性能設定
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        client_max_body_size 10M;
+        
+        # Gzip Compression | Gzip壓縮
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types
+            text/plain
+            text/css
+            text/xml
+            text/javascript
+            application/json
+            application/javascript
+            application/xml+rss
+            application/atom+xml
+            image/svg+xml;
+        
+        # Rate Limiting | 速率限制
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=login:10m rate=1r/s;
+        
+        # Upstream Configuration | 上游配置
+        upstream aifx-backend {
+            least_conn;
+            server aifx-app-service:80 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+        
+        # Health Check | 健康檢查
+        upstream aifx-health {
+            server aifx-app-service:80;
+        }
+        
+        # Main Server Block | 主要伺服器區塊
+        server {
+            listen 80;
+            listen [::]:80;
+            server_name aifx.example.com api.aifx.example.com;
+            
+            # Security Headers | 安全標頭
+            add_header X-Frame-Options DENY always;
+            add_header X-Content-Type-Options nosniff always;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" always;
+            
+            # Health Check Endpoint | 健康檢查端點
+            location /nginx-health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+            
+            # API Rate Limiting | API速率限制
+            location /api/ {
+                limit_req zone=api burst=20 nodelay;
+                limit_req_status 429;
+                
+                proxy_pass http://aifx-backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                proxy_connect_timeout 5s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 60s;
+                proxy_buffering on;
+                proxy_buffer_size 4k;
+                proxy_buffers 8 4k;
+            }
+            
+            # WebSocket Support | WebSocket支援
+            location /ws/ {
+                proxy_pass http://aifx-backend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                proxy_connect_timeout 7d;
+                proxy_send_timeout 7d;
+                proxy_read_timeout 7d;
+            }
+            
+            # Static Files | 靜態檔案
+            location /static/ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+                try_files $uri $uri/ =404;
+            }
+            
+            # Main Application | 主要應用程式
+            location / {
+                proxy_pass http://aifx-backend;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                proxy_connect_timeout 5s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 60s;
+                proxy_buffering on;
+            }
+            
+            # Error Pages | 錯誤頁面
+            error_page 404 /404.html;
+            error_page 500 502 503 504 /50x.html;
+            
+            location = /50x.html {
+                root /usr/share/nginx/html;
+            }
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+  labels:
+    app: prometheus
+    component: configuration
+    environment: production
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'aifx-production'
+        environment: 'production'
+    
+    rule_files:
+      - "/etc/prometheus/rules/*.yml"
+    
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+    
+    scrape_configs:
+      # Prometheus自我監控
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+      
+      # Kubernetes API伺服器
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+                - default
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+      
+      # AIFX應用程式指標
+      - job_name: 'aifx-app'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - aifx
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: aifx-app
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+      
+      # AIFX AI工作器指標
+      - job_name: 'aifx-ai-worker'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - aifx
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: aifx-ai-worker
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+      
+      # Nginx指標
+      - job_name: 'nginx'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - aifx
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: nginx
+      
+      # Node Exporter
+      - job_name: 'node-exporter'
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics

@@ -1,0 +1,578 @@
+# AIFX - Advanced Scaling and Load Balancing Configuration
+# AIFX - 進階擴展和負載均衡配置
+
+---
+# Vertical Pod Autoscaler for AIFX Application | AIFX應用程式的垂直Pod自動擴展器
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: aifx-app-vpa
+  namespace: aifx
+  labels:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/component: vpa
+    environment: production
+  annotations:
+    description: "Vertical Pod Autoscaler for AIFX application | AIFX應用程式的垂直Pod自動擴展器"
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: aifx-app
+  updatePolicy:
+    updateMode: "Auto"  # Automatically apply recommendations | 自動應用建議
+  resourcePolicy:
+    containerPolicies:
+    - containerName: aifx-app
+      minAllowed:
+        cpu: 100m
+        memory: 256Mi
+      maxAllowed:
+        cpu: 4
+        memory: 8Gi
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+
+---
+# Vertical Pod Autoscaler for AI Workers | AI工作器的垂直Pod自動擴展器
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: aifx-ai-worker-vpa
+  namespace: aifx
+  labels:
+    app: aifx-ai-worker
+    app.kubernetes.io/name: aifx-ai-worker
+    app.kubernetes.io/component: vpa
+    environment: production
+  annotations:
+    description: "Vertical Pod Autoscaler for AIFX AI workers | AIFX AI工作器的垂直Pod自動擴展器"
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: aifx-ai-worker
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: aifx-ai-worker
+      minAllowed:
+        cpu: 500m
+        memory: 2Gi
+      maxAllowed:
+        cpu: 8
+        memory: 16Gi
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+
+---
+# Custom Resource Definition for Advanced HPA | 進階HPA的自定義資源定義
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: advancedhorizontalpodautoscalers.autoscaling.aifx.io
+  labels:
+    app: aifx
+    component: crd
+spec:
+  group: autoscaling.aifx.io
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              scaleTargetRef:
+                type: object
+                properties:
+                  apiVersion:
+                    type: string
+                  kind:
+                    type: string
+                  name:
+                    type: string
+              minReplicas:
+                type: integer
+                minimum: 1
+              maxReplicas:
+                type: integer
+                minimum: 1
+              metrics:
+                type: array
+                items:
+                  type: object
+              behavior:
+                type: object
+              tradingSpecific:
+                type: object
+                properties:
+                  marketHours:
+                    type: object
+                  volatilityThreshold:
+                    type: number
+                  signalProcessingRate:
+                    type: number
+          status:
+            type: object
+  scope: Namespaced
+  names:
+    plural: advancedhorizontalpodautoscalers
+    singular: advancedhorizontalpodautoscaler
+    kind: AdvancedHorizontalPodAutoscaler
+    shortNames:
+    - ahpa
+
+---
+# Advanced HPA with Trading-Specific Metrics | 具有交易特定指標的進階HPA
+apiVersion: autoscaling.aifx.io/v1
+kind: AdvancedHorizontalPodAutoscaler
+metadata:
+  name: aifx-advanced-hpa
+  namespace: aifx
+  labels:
+    app: aifx-app
+    component: advanced-hpa
+    environment: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: aifx-app
+  minReplicas: 3
+  maxReplicas: 50
+  
+  # Trading-specific configuration | 交易特定配置
+  tradingSpecific:
+    marketHours:
+      # Different scaling during market hours | 市場時段的不同擴展策略
+      active:
+        timezone: "America/New_York"
+        start: "09:00"
+        end: "16:00"
+        minReplicas: 5
+        maxReplicas: 30
+      inactive:
+        minReplicas: 2
+        maxReplicas: 10
+    
+    volatilityThreshold: 0.8  # Scale up during high volatility | 高波動時擴大規模
+    signalProcessingRate: 1000  # Signals per minute threshold | 每分鐘信號閾值
+  
+  metrics:
+  # CPU and Memory (standard) | CPU和記憶體（標準）
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  
+  # Trading-specific metrics | 交易特定指標
+  - type: Pods
+    pods:
+      metric:
+        name: trading_signals_per_second
+      target:
+        type: AverageValue
+        averageValue: "10"
+  - type: Pods
+    pods:
+      metric:
+        name: active_trading_sessions
+      target:
+        type: AverageValue
+        averageValue: "50"
+  - type: Pods
+    pods:
+      metric:
+        name: ai_model_inference_queue_depth
+      target:
+        type: AverageValue
+        averageValue: "5"
+  
+  # External metrics from market data | 來自市場數據的外部指標
+  - type: External
+    external:
+      metric:
+        name: market_volatility_index
+        selector:
+          matchLabels:
+            market: "forex"
+      target:
+        type: Value
+        value: "0.5"
+  - type: External
+    external:
+      metric:
+        name: pending_orders_count
+        selector:
+          matchLabels:
+            broker: "all"
+      target:
+        type: Value
+        value: "100"
+  
+  behavior:
+    scaleUp:
+      # Fast scale up during market volatility | 市場波動時快速擴大
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 5
+        periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      # Gradual scale down to avoid disrupting trades | 逐漸縮小規模以避免干擾交易
+      stabilizationWindowSeconds: 900  # 15 minutes
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+# Cluster Autoscaler Configuration | 叢集自動擴展器配置
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cluster-autoscaler
+  namespace: kube-system
+  labels:
+    app: cluster-autoscaler
+    app.kubernetes.io/name: cluster-autoscaler
+    app.kubernetes.io/instance: cluster-autoscaler
+    app.kubernetes.io/version: "1.28.0"
+    environment: production
+  annotations:
+    description: "Cluster Autoscaler for automatic node scaling | 自動節點擴展的叢集自動擴展器"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cluster-autoscaler
+  template:
+    metadata:
+      labels:
+        app: cluster-autoscaler
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8085"
+        prometheus.io/path: "/metrics"
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+    spec:
+      serviceAccountName: cluster-autoscaler
+      containers:
+      - name: cluster-autoscaler
+        image: k8s.gcr.io/autoscaling/cluster-autoscaler:v1.28.0
+        imagePullPolicy: IfNotPresent
+        
+        command:
+        - ./cluster-autoscaler
+        - --v=4
+        - --stderrthreshold=info
+        - --cloud-provider=aws
+        - --skip-nodes-with-local-storage=false
+        - --expander=least-waste
+        - --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/aifx-production
+        - --balance-similar-node-groups
+        - --skip-nodes-with-system-pods=false
+        - --scale-down-enabled=true
+        - --scale-down-delay-after-add=10m
+        - --scale-down-unneeded-time=10m
+        - --scale-down-utilization-threshold=0.5
+        - --max-node-provision-time=15m
+        - --scan-interval=10s
+        - --max-nodes-total=100
+        - --cores-total=0:320
+        - --memory-total=0:1280
+        - --node-autoprovisioning-enabled=false
+        
+        env:
+        - name: AWS_REGION
+          value: us-west-2
+        - name: AWS_DEFAULT_REGION
+          value: us-west-2
+        
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+          limits:
+            cpu: 100m
+            memory: 300Mi
+        
+        volumeMounts:
+        - name: ssl-certs
+          mountPath: /etc/ssl/certs/ca-certificates.crt
+          readOnly: true
+        
+        livenessProbe:
+          httpGet:
+            path: /health-check
+            port: 8085
+          initialDelaySeconds: 600
+          periodSeconds: 60
+        
+        readinessProbe:
+          httpGet:
+            path: /health-check
+            port: 8085
+          initialDelaySeconds: 10
+          periodSeconds: 60
+        
+      volumes:
+      - name: ssl-certs
+        hostPath:
+          path: /etc/ssl/certs/ca-certificates.crt
+      
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/arch: amd64
+      
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Equal
+      - key: CriticalAddonsOnly
+        operator: Exists
+
+---
+# ServiceAccount for Cluster Autoscaler | 叢集自動擴展器的服務帳戶
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-autoscaler
+  namespace: kube-system
+  labels:
+    k8s-addon: cluster-autoscaler.addons.k8s.io
+    k8s-app: cluster-autoscaler
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/cluster-autoscaler-role
+
+---
+# ClusterRole for Cluster Autoscaler | 叢集自動擴展器的叢集角色
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-autoscaler
+  labels:
+    k8s-addon: cluster-autoscaler.addons.k8s.io
+    k8s-app: cluster-autoscaler
+rules:
+- apiGroups: [""]
+  resources: ["events", "endpoints"]
+  verbs: ["create", "patch"]
+- apiGroups: [""]
+  resources: ["pods/eviction"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["pods/status"]
+  verbs: ["update"]
+- apiGroups: [""]
+  resources: ["endpoints"]
+  resourceNames: ["cluster-autoscaler"]
+  verbs: ["get", "update"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["watch", "list", "get", "update"]
+- apiGroups: [""]
+  resources: ["namespaces", "pods", "services", "replicationcontrollers", "persistentvolumeclaims", "persistentvolumes"]
+  verbs: ["watch", "list", "get"]
+- apiGroups: ["extensions"]
+  resources: ["replicasets", "daemonsets"]
+  verbs: ["watch", "list", "get"]
+- apiGroups: ["policy"]
+  resources: ["poddisruptionbudgets"]
+  verbs: ["watch", "list"]
+- apiGroups: ["apps"]
+  resources: ["statefulsets", "replicasets", "daemonsets"]
+  verbs: ["watch", "list", "get"]
+- apiGroups: ["storage.k8s.io"]
+  resources: ["storageclasses", "csinodes", "csistoragecapacities", "csidrivers"]
+  verbs: ["watch", "list", "get"]
+- apiGroups: ["batch", "extensions"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "patch", "watch"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create"]
+- apiGroups: ["coordination.k8s.io"]
+  resourceNames: ["cluster-autoscaler"]
+  resources: ["leases"]
+  verbs: ["get", "update"]
+
+---
+# ClusterRoleBinding for Cluster Autoscaler | 叢集自動擴展器的叢集角色綁定
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-autoscaler
+  labels:
+    k8s-addon: cluster-autoscaler.addons.k8s.io
+    k8s-app: cluster-autoscaler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-autoscaler
+subjects:
+- kind: ServiceAccount
+  name: cluster-autoscaler
+  namespace: kube-system
+
+---
+# ConfigMap for scaling policies | 擴展策略的ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scaling-policies-config
+  namespace: aifx
+  labels:
+    app: aifx-app
+    component: scaling-configuration
+data:
+  # Trading hours based scaling | 基於交易時段的擴展
+  trading-hours.yaml: |
+    # Market Trading Hours Configuration | 市場交易時段配置
+    markets:
+      forex:
+        timezone: "UTC"
+        sessions:
+          sydney:
+            start: "21:00"
+            end: "06:00"
+            weight: 0.7
+          tokyo:
+            start: "23:00"
+            end: "08:00"
+            weight: 0.8
+          london:
+            start: "07:00"
+            end: "16:00"
+            weight: 1.0
+          new_york:
+            start: "12:00"
+            end: "21:00"
+            weight: 1.0
+    
+    # Scaling rules based on market sessions | 基於市場時段的擴展規則
+    scaling_rules:
+      high_activity:  # London-NY overlap | 倫敦-紐約重疊時段
+        time_range: "12:00-16:00"
+        min_replicas: 8
+        max_replicas: 30
+        cpu_threshold: 60
+      
+      medium_activity:  # Single major market | 單一主要市場
+        time_range: "07:00-12:00,16:00-21:00"
+        min_replicas: 5
+        max_replicas: 20
+        cpu_threshold: 70
+      
+      low_activity:  # Asian session only | 僅亞洲時段
+        time_range: "21:00-07:00"
+        min_replicas: 3
+        max_replicas: 10
+        cpu_threshold: 80
+  
+  # Volatility-based scaling | 基於波動性的擴展
+  volatility-scaling.yaml: |
+    # Market Volatility Thresholds | 市場波動性閾值
+    volatility_levels:
+      low:
+        threshold: 0.0-0.3
+        replica_multiplier: 1.0
+        response_time: "5m"
+      
+      medium:
+        threshold: 0.3-0.6
+        replica_multiplier: 1.5
+        response_time: "2m"
+      
+      high:
+        threshold: 0.6-0.8
+        replica_multiplier: 2.0
+        response_time: "30s"
+      
+      extreme:
+        threshold: 0.8-1.0
+        replica_multiplier: 3.0
+        response_time: "15s"
+        emergency_scaling: true
+    
+    # Emergency scaling procedures | 緊急擴展程序
+    emergency_scaling:
+      conditions:
+        - market_crash_detected
+        - flash_crash_event
+        - extreme_volatility_spike
+      actions:
+        - scale_to_max_capacity
+        - enable_circuit_breakers
+        - activate_risk_management
+        - notify_administrators
+
+---
+# PrometheusRule for scaling alerts | 擴展警報的PrometheusRule
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: aifx-scaling-alerts
+  namespace: aifx
+  labels:
+    app: aifx-app
+    component: scaling-alerts
+spec:
+  groups:
+  - name: scaling.rules
+    rules:
+    # HPA at maximum capacity | HPA達到最大容量
+    - alert: HPAMaxCapacity
+      expr: kube_horizontalpodautoscaler_status_current_replicas >= kube_horizontalpodautoscaler_spec_max_replicas
+      for: 5m
+      labels:
+        severity: warning
+        service: aifx
+      annotations:
+        summary: "HPA {{ $labels.horizontalpodautoscaler }} is at maximum capacity"
+        description: "HPA {{ $labels.horizontalpodautoscaler }} in namespace {{ $labels.namespace }} has reached maximum replicas"
+    
+    # Scaling thrashing detected | 檢測到擴展抖動
+    - alert: ScalingThrashing
+      expr: changes(kube_horizontalpodautoscaler_status_current_replicas[30m]) > 10
+      for: 5m
+      labels:
+        severity: warning
+        service: aifx
+      annotations:
+        summary: "Scaling thrashing detected for {{ $labels.horizontalpodautoscaler }}"
+        description: "HPA {{ $labels.horizontalpodautoscaler }} has scaled up/down more than 10 times in 30 minutes"
+    
+    # Cluster autoscaler issues | 叢集自動擴展器問題
+    - alert: ClusterAutoscalerErrors
+      expr: increase(cluster_autoscaler_errors_total[5m]) > 0
+      for: 2m
+      labels:
+        severity: warning
+        service: cluster-autoscaler
+      annotations:
+        summary: "Cluster Autoscaler errors detected"
+        description: "Cluster Autoscaler has encountered {{ $value }} errors in the last 5 minutes"
