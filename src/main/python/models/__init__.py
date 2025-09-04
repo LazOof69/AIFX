@@ -7,7 +7,23 @@ AI model components for AIFX system:
 AIFX系統的AI模型組件：
 
 - XGBoost models | XGBoost模型
-- Random Forest classifiers | 隨機森林分類器
+- Random Forest classifiers | 隨機森林分類器  
 - LSTM neural networks | LSTM神經網絡
 - Model evaluation and validation | 模型評估和驗證
+- Base model framework | 基礎模型框架
+- Model registry and versioning | 模型註冊表和版本控制
 """
+
+# Import all model classes for easy access | 導入所有模型類以便於訪問
+from .base_model import BaseModel, ModelRegistry
+from .xgboost_model import XGBoostModel
+from .random_forest_model import RandomForestModel
+from .lstm_model import LSTMModel
+
+__all__ = [
+    'BaseModel',
+    'ModelRegistry', 
+    'XGBoostModel',
+    'RandomForestModel',
+    'LSTMModel'
+]
