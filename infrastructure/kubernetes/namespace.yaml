@@ -1,0 +1,89 @@
+# AIFX - Kubernetes Namespaces Configuration
+# AIFX - Kubernetes命名空間配置
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aifx
+  labels:
+    name: aifx
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/version: "4.0.0"
+    app.kubernetes.io/component: application
+    app.kubernetes.io/part-of: aifx-trading-system
+    app.kubernetes.io/managed-by: kubernetes
+    environment: production
+  annotations:
+    description: "AIFX AI-Enhanced Forex Trading System namespace"
+    contact: "aifx-team@example.com"
+    documentation: "https://github.com/LazOof69/AIFX"
+    
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+    app.kubernetes.io/name: monitoring
+    app.kubernetes.io/instance: monitoring
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: aifx-trading-system
+    app.kubernetes.io/managed-by: kubernetes
+    environment: production
+  annotations:
+    description: "Monitoring and observability namespace for AIFX"
+    
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    name: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/version: "1.9.0"
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/managed-by: kubernetes
+    environment: production
+  annotations:
+    description: "Ingress controller namespace for load balancing"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    name: cert-manager
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/version: "1.13.0"
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: cert-manager
+    app.kubernetes.io/managed-by: kubernetes
+    environment: production
+  annotations:
+    description: "Certificate management namespace for SSL/TLS"
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-system-addons
+  labels:
+    name: kube-system-addons
+    app.kubernetes.io/name: kube-system-addons
+    app.kubernetes.io/instance: kube-system-addons
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: addon
+    app.kubernetes.io/part-of: kubernetes
+    app.kubernetes.io/managed-by: kubernetes
+    environment: production
+  annotations:
+    description: "Additional Kubernetes system addons namespace"

@@ -1,0 +1,353 @@
+# AIFX - Kubernetes Deployment Configuration
+# AIFX - Kubernetes部署配置
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aifx-app
+  namespace: aifx
+  labels:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/version: "4.0.0"
+    app.kubernetes.io/component: application
+    app.kubernetes.io/part-of: aifx-trading-system
+    app.kubernetes.io/managed-by: kubernetes
+    environment: production
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    description: "AIFX AI-Enhanced Forex Trading System main application"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: aifx-app
+      app.kubernetes.io/name: aifx
+      app.kubernetes.io/instance: aifx
+  template:
+    metadata:
+      labels:
+        app: aifx-app
+        app.kubernetes.io/name: aifx
+        app.kubernetes.io/instance: aifx
+        app.kubernetes.io/version: "4.0.0"
+        app.kubernetes.io/component: application
+        environment: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+        kubectl.kubernetes.io/restartedAt: ""
+    spec:
+      serviceAccountName: aifx-service-account
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: aifx-app
+        image: aifx:latest  # Will be replaced with actual registry URL
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        - name: metrics
+          containerPort: 8001
+          protocol: TCP
+        env:
+        - name: AIFX_ENV
+          value: "production"
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: aifx-secrets
+              key: postgres-host
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: aifx-secrets
+              key: postgres-db
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: aifx-secrets
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: aifx-secrets
+              key: postgres-password
+        - name: REDIS_HOST
+          valueFrom:
+            secretKeyRef:
+              name: aifx-secrets
+              key: redis-host
+        - name: MONGODB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: aifx-secrets
+              key: mongodb-host
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: aifx-config
+              key: log-level
+        - name: PROMETHEUS_MULTIPROC_DIR
+          value: "/tmp/prometheus_multiproc"
+        envFrom:
+        - configMapRef:
+            name: aifx-config
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+        volumeMounts:
+        - name: config
+          mountPath: /home/aifx/app/config
+          readOnly: true
+        - name: logs
+          mountPath: /home/aifx/app/logs
+        - name: models
+          mountPath: /home/aifx/app/models
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: prometheus-multiproc
+          mountPath: /tmp/prometheus_multiproc
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          seccompProfile:
+            type: RuntimeDefault
+      volumes:
+      - name: config
+        configMap:
+          name: aifx-config
+          defaultMode: 0644
+      - name: logs
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: models
+        persistentVolumeClaim:
+          claimName: aifx-models-pvc
+      - name: tmp
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: prometheus-multiproc
+        emptyDir:
+          sizeLimit: 100Mi
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/os: linux
+        node.kubernetes.io/instance-type: "t3.large"
+      tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "aifx"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - aifx-app
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: In
+                values:
+                - t3.large
+                - t3.xlarge
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aifx-ai-worker
+  namespace: aifx
+  labels:
+    app: aifx-ai-worker
+    app.kubernetes.io/name: aifx-ai-worker
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/version: "4.0.0"
+    app.kubernetes.io/component: ai-worker
+    app.kubernetes.io/part-of: aifx-trading-system
+    app.kubernetes.io/managed-by: kubernetes
+    environment: production
+  annotations:
+    description: "AIFX AI model workers for intensive computations"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: aifx-ai-worker
+      app.kubernetes.io/name: aifx-ai-worker
+      app.kubernetes.io/instance: aifx
+  template:
+    metadata:
+      labels:
+        app: aifx-ai-worker
+        app.kubernetes.io/name: aifx-ai-worker
+        app.kubernetes.io/instance: aifx
+        app.kubernetes.io/version: "4.0.0"
+        app.kubernetes.io/component: ai-worker
+        environment: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8002"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: aifx-service-account
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+      - name: aifx-ai-worker
+        image: aifx:latest  # Will be replaced with actual registry URL
+        imagePullPolicy: Always
+        command: ["python", "-m", "src.main.python.workers.ai_worker"]
+        ports:
+        - name: metrics
+          containerPort: 8002
+          protocol: TCP
+        env:
+        - name: WORKER_TYPE
+          value: "ai-worker"
+        - name: AIFX_ENV
+          value: "production"
+        envFrom:
+        - configMapRef:
+            name: aifx-config
+        - secretRef:
+            name: aifx-secrets
+        resources:
+          requests:
+            cpu: 1
+            memory: 4Gi
+          limits:
+            cpu: 4
+            memory: 8Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: metrics
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: models
+          mountPath: /home/aifx/app/models
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: aifx-models-pvc
+      - name: tmp
+        emptyDir:
+          sizeLimit: 2Gi
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-role: "ai-workload"
+      tolerations:
+      - key: "ai-workload"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: In
+                values:
+                - r5.xlarge
+                - r5.2xlarge

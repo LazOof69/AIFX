@@ -1,0 +1,184 @@
+# AIFX - Kubernetes Services Configuration
+# AIFX - Kubernetes服務配置
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aifx-app-service
+  namespace: aifx
+  labels:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/version: "4.0.0"
+    app.kubernetes.io/component: service
+    app.kubernetes.io/part-of: aifx-trading-system
+    app.kubernetes.io/managed-by: kubernetes
+    environment: production
+  annotations:
+    description: "AIFX main application service"
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8000"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval-seconds: "10"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout-seconds: "5"
+    service.beta.kubernetes.io/aws-load-balancer-healthy-threshold-count: "2"
+    service.beta.kubernetes.io/aws-load-balancer-unhealthy-threshold-count: "3"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 8001
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+  sessionAffinity: None
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aifx-ai-worker-service
+  namespace: aifx
+  labels:
+    app: aifx-ai-worker
+    app.kubernetes.io/name: aifx-ai-worker
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/version: "4.0.0"
+    app.kubernetes.io/component: service
+    app.kubernetes.io/part-of: aifx-trading-system
+    app.kubernetes.io/managed-by: kubernetes
+    environment: production
+  annotations:
+    description: "AIFX AI worker service for internal communication"
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 8002
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: aifx-ai-worker
+    app.kubernetes.io/name: aifx-ai-worker
+    app.kubernetes.io/instance: aifx
+  sessionAffinity: None
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aifx-headless-service
+  namespace: aifx
+  labels:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/component: headless-service
+    environment: production
+  annotations:
+    description: "Headless service for direct pod communication"
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http
+    protocol: TCP
+  selector:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aifx-external-service
+  namespace: aifx
+  labels:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/component: external-service
+    environment: production
+  annotations:
+    description: "External LoadBalancer service for AIFX application"
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "traffic-port"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval-seconds: "30"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout-seconds: "10"
+    service.beta.kubernetes.io/aws-load-balancer-healthy-threshold-count: "2"
+    service.beta.kubernetes.io/aws-load-balancer-unhealthy-threshold-count: "3"
+    # SSL Certificate ARN (replace with actual certificate)
+    # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:us-west-2:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+    external-dns.alpha.kubernetes.io/hostname: "aifx.example.com"  # Replace with actual domain
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: http
+    protocol: TCP
+  selector:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+  sessionAffinity: None
+  externalTrafficPolicy: Cluster
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aifx-nodeport-service
+  namespace: aifx
+  labels:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/component: nodeport-service
+    environment: production
+  annotations:
+    description: "NodePort service for development and testing access"
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+    nodePort: 30080
+  - name: https
+    port: 443
+    targetPort: http
+    protocol: TCP
+    nodePort: 30443
+  selector:
+    app: aifx-app
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+  sessionAffinity: None
