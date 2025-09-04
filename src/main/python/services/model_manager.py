@@ -17,11 +17,14 @@ import numpy as np
 import pandas as pd
 
 # Import model components | 導入模型組件
-from ..models.base_model import BaseModel, ModelRegistry
-from ..models.xgboost_model import XGBoostModel
-from ..models.random_forest_model import RandomForestModel
-from ..models.lstm_model import LSTMModel
-from ..evaluation.performance_metrics import TradingPerformanceMetrics
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from models.base_model import BaseModel, ModelRegistry
+from models.xgboost_model import XGBoostModel
+from models.random_forest_model import RandomForestModel
+from models.lstm_model import LSTMModel
+from evaluation.performance_metrics import TradingPerformanceMetrics
 
 logger = logging.getLogger(__name__)
 

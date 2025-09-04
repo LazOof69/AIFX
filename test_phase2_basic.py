@@ -123,14 +123,14 @@ class Phase2BasicTester:
         
         # Test performance metrics | 測試性能指標
         try:
-            from evaluation.performance_metrics import PerformanceMetrics
+            from evaluation.performance_metrics import TradingPerformanceMetrics as PerformanceMetrics
             self.log_test("Performance Metrics Import", True)
         except Exception as e:
             self.log_test("Performance Metrics Import", False, f"Error: {str(e)}")
         
         # Test model manager | 測試模型管理器
         try:
-            from services.model_manager import ModelManager
+            from services.model_manager import ModelLifecycleManager as ModelManager
             self.log_test("Model Manager Import", True)
         except Exception as e:
             self.log_test("Model Manager Import", False, f"Error: {str(e)}")
@@ -272,7 +272,7 @@ class Phase2BasicTester:
         print(f"\n{Colors.BOLD}4. Performance Metrics Basic | 基本性能指標{Colors.END}")
         
         try:
-            from evaluation.performance_metrics import PerformanceMetrics
+            from evaluation.performance_metrics import TradingPerformanceMetrics as PerformanceMetrics
             
             # Create sample predictions | 創建樣本預測
             np.random.seed(42)
@@ -290,7 +290,8 @@ class Phase2BasicTester:
                 self.log_test("Classification Metrics", False, "Metrics calculation failed")
             
             # Test directional accuracy | 測試方向準確度
-            direction_acc = metrics.calculate_directional_accuracy(y_true, y_pred)
+            trading_metrics = metrics.calculate_trading_metrics(y_true, y_pred)
+            direction_acc = trading_metrics.get('directional_accuracy', 0.0)
             if direction_acc is not None:
                 self.log_test("Directional Accuracy", True, f"Direction accuracy: {direction_acc:.3f}")
             else:

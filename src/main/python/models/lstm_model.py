@@ -119,7 +119,7 @@ class LSTMModel(BaseModel):
         else:
             return X_sequences, None
     
-    def _build_model(self, input_shape: Tuple[int, int], **kwargs) -> tf.keras.Model:
+    def _build_model(self, input_shape: Tuple[int, int], **kwargs):  # -> tf.keras.Model when available
         """
         Build LSTM neural network architecture | 構建LSTM神經網絡架構
         
@@ -417,7 +417,10 @@ class LSTMModel(BaseModel):
         
         # Count parameters | 計算參數
         total_params = self.model.count_params()
-        trainable_params = sum([tf.keras.backend.count_params(w) for w in self.model.trainable_weights])
+        if TENSORFLOW_AVAILABLE:
+            trainable_params = sum([tf.keras.backend.count_params(w) for w in self.model.trainable_weights])
+        else:
+            trainable_params = 0
         non_trainable_params = total_params - trainable_params
         
         # Get layer information | 獲取層信息
@@ -431,14 +434,15 @@ class LSTMModel(BaseModel):
             }
             
             # Add layer-specific info | 添加層特定信息
-            if isinstance(layer, tf.keras.layers.LSTM):
-                layer_info['units'] = layer.units
-                layer_info['return_sequences'] = layer.return_sequences
-            elif isinstance(layer, tf.keras.layers.Dense):
-                layer_info['units'] = layer.units
-                layer_info['activation'] = layer.activation.__name__
-            elif isinstance(layer, tf.keras.layers.Dropout):
-                layer_info['rate'] = layer.rate
+            if TENSORFLOW_AVAILABLE:
+                if isinstance(layer, tf.keras.layers.LSTM):
+                    layer_info['units'] = layer.units
+                    layer_info['return_sequences'] = layer.return_sequences
+                elif isinstance(layer, tf.keras.layers.Dense):
+                    layer_info['units'] = layer.units
+                    layer_info['activation'] = layer.activation.__name__
+                elif isinstance(layer, tf.keras.layers.Dropout):
+                    layer_info['rate'] = layer.rate
                 
             layers_info.append(layer_info)
         
@@ -506,7 +510,10 @@ class LSTMModel(BaseModel):
         
         # Load Keras model | 加載Keras模型
         model_path = filepath.replace('.pkl', '.h5')
-        self.model = tf.keras.models.load_model(model_path)
+        if TENSORFLOW_AVAILABLE:
+            self.model = tf.keras.models.load_model(model_path)
+        else:
+            raise ImportError("TensorFlow not available. Cannot load LSTM model.")
         
         # Load additional data | 加載額外數據
         data_path = filepath.replace('.h5', '_data.pkl')

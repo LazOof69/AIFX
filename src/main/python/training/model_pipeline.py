@@ -16,15 +16,15 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
 # Import model classes | 導入模型類
-from ..models.base_model import BaseModel, ModelRegistry
-from ..models.xgboost_model import XGBoostModel
-from ..models.random_forest_model import RandomForestModel
-from ..models.lstm_model import LSTMModel
-
-# Import data utilities | 導入數據工具
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from models.base_model import BaseModel, ModelRegistry
+from models.xgboost_model import XGBoostModel
+from models.random_forest_model import RandomForestModel
+from models.lstm_model import LSTMModel
+
+# Data utilities already imported via models
 
 logger = logging.getLogger(__name__)
 

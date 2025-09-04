@@ -446,7 +446,7 @@ class Phase2Tester:
         
         try:
             # Test import | 測試導入
-            from evaluation.performance_metrics import PerformanceMetrics
+            from evaluation.performance_metrics import TradingPerformanceMetrics as PerformanceMetrics
             self.log_test("Performance Metrics Import", True)
             
             # Create sample predictions and actual values | 創建樣本預測和實際值
