@@ -20,6 +20,7 @@ from datetime import datetime
 
 from .signal_combiner import BaseSignalCombiner, TradingSignal, SignalType
 from .confidence_scorer import AdvancedConfidenceScorer, ConfidenceComponents
+from .weight_optimizer import DynamicWeightOptimizer, WeightOptimizationConfig, OptimizationMethod
 from models.base_model import BaseModel
 from models.xgboost_model import XGBoostModel
 from models.random_forest_model import RandomForestModel
@@ -65,6 +66,16 @@ class AISignalCombiner(BaseSignalCombiner):
             agreement_threshold=0.7
         )
         
+        # Initialize dynamic weight optimizer | 初始化動態權重優化器
+        optimizer_config = WeightOptimizationConfig(
+            optimization_method=OptimizationMethod.PERFORMANCE_BASED,
+            lookback_window=50,
+            rebalance_frequency=10,
+            min_weight=0.05,
+            max_weight=0.7
+        )
+        self.weight_optimizer = DynamicWeightOptimizer(optimizer_config)
+        
         # Default weights for different models | 不同模型的默認權重
         default_weights = {
             'XGBoost': 0.4,
@@ -73,7 +84,8 @@ class AISignalCombiner(BaseSignalCombiner):
         }
         self.set_weights(default_weights)
         
-        logger.info(f"Initialized AI Signal Combiner with {len(self.models)} models and advanced confidence scoring")
+        logger.info(f"Initialized AI Signal Combiner with {len(self.models)} models, "
+                   f"advanced confidence scoring, and dynamic weight optimization")
     
     def add_model(self, model_name: str, model: BaseModel):
         """
@@ -440,3 +452,183 @@ class AISignalCombiner(BaseSignalCombiner):
             'signal_history_count': len(self.confidence_scorer.signal_history),
             'performance_cache_sources': list(self.confidence_scorer.performance_cache.keys())
         }
+    
+    def add_weight_optimization_result(self, signal_source: str, trade_result: Dict[str, Any]):
+        """
+        Add trading result for weight optimization | 添加用於權重優化的交易結果
+        
+        Args:
+            signal_source: Source of the signal that generated this result | 生成此結果的信號來源
+            trade_result: Trading result data | 交易結果數據
+        """
+        # Update weight optimizer with the result | 用結果更新權重優化器
+        self.weight_optimizer.update_performance(signal_source, trade_result)
+        
+        # Also update confidence scorer for comprehensive tracking | 也更新信心評分器以進行全面追蹤
+        signal_info = {
+            'signal_source': signal_source,
+            'timestamp': datetime.now().isoformat()
+        }
+        self.confidence_scorer.add_signal_result(signal_info, trade_result)
+        
+        logger.info(f"Added weight optimization result for {signal_source}: {trade_result.get('profit_loss', 'N/A')}")
+    
+    def optimize_weights_if_needed(self, signal_sources: List[str], 
+                                 market_data: Optional[pd.DataFrame] = None) -> bool:
+        """
+        Optimize weights if needed based on performance | 如果需要則基於績效優化權重
+        
+        Args:
+            signal_sources: List of available signal sources | 可用信號來源列表
+            market_data: Current market data for optimization | 用於優化的當前市場數據
+            
+        Returns:
+            True if weights were updated, False otherwise | 如果權重已更新則為True，否則為False
+        """
+        try:
+            # Get optimized weights from the weight optimizer | 從權重優化器獲取優化權重
+            new_weights = self.weight_optimizer.optimize_weights(signal_sources, market_data)
+            
+            if new_weights and new_weights != self.weights:
+                # Update the combiner weights | 更新組合器權重
+                old_weights = self.weights.copy()
+                self.set_weights(new_weights)
+                
+                logger.info(f"Weights optimized - Old: {old_weights}, New: {self.weights}")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error during weight optimization: {e}")
+            return False
+    
+    def update_weight_optimization_config(self, config: WeightOptimizationConfig):
+        """
+        Update weight optimization configuration | 更新權重優化配置
+        
+        Args:
+            config: New optimization configuration | 新的優化配置
+        """
+        self.weight_optimizer.update_configuration(config)
+        logger.info(f"Updated weight optimization config: {config.optimization_method.value}")
+    
+    def get_weight_optimization_report(self) -> Dict[str, Any]:
+        """
+        Get comprehensive weight optimization report | 獲取綜合權重優化報告
+        
+        Returns:
+            Detailed weight optimization analysis | 詳細權重優化分析
+        """
+        base_report = self.weight_optimizer.get_optimization_report()
+        
+        # Add AI-specific information | 添加AI特定信息
+        ai_specific_info = {
+            'model_count': len(self.models),
+            'model_weights': {name: self.weights.get(name, 0.0) for name in self.models.keys()},
+            'prediction_thresholds': self.prediction_thresholds,
+            'recent_rebalancing_effectiveness': self._evaluate_recent_rebalancing_effectiveness()
+        }
+        
+        return {
+            **base_report,
+            'ai_combiner_info': ai_specific_info
+        }
+    
+    def _evaluate_recent_rebalancing_effectiveness(self) -> Dict[str, Any]:
+        """
+        Evaluate effectiveness of recent weight rebalancing | 評估近期權重重新平衡的效果
+        
+        Returns:
+            Rebalancing effectiveness metrics | 重新平衡效果指標
+        """
+        try:
+            weight_history = self.weight_optimizer.historical_weights
+            if len(weight_history) < 2:
+                return {'status': 'insufficient_data'}
+            
+            # Get last two weight configurations | 獲取最後兩個權重配置
+            current_config = weight_history[-1]
+            previous_config = weight_history[-2]
+            
+            # Calculate weight stability | 計算權重穩定性
+            weight_changes = {}
+            total_change = 0.0
+            
+            for source in current_config['weights'].keys():
+                current_weight = current_config['weights'].get(source, 0.0)
+                previous_weight = previous_config['weights'].get(source, 0.0)
+                change = abs(current_weight - previous_weight)
+                weight_changes[source] = change
+                total_change += change
+            
+            return {
+                'status': 'analyzed',
+                'total_weight_change': total_change,
+                'individual_changes': weight_changes,
+                'rebalancing_frequency': len(weight_history),
+                'most_volatile_source': max(weight_changes.items(), key=lambda x: x[1])[0] if weight_changes else None,
+                'most_stable_source': min(weight_changes.items(), key=lambda x: x[1])[0] if weight_changes else None
+            }
+            
+        except Exception as e:
+            logger.warning(f"Error evaluating rebalancing effectiveness: {e}")
+            return {'status': 'error', 'message': str(e)}
+    
+    def set_optimization_method(self, method: OptimizationMethod):
+        """
+        Set weight optimization method | 設置權重優化方法
+        
+        Args:
+            method: Optimization method to use | 要使用的優化方法
+        """
+        config = self.weight_optimizer.config
+        config.optimization_method = method
+        self.weight_optimizer.update_configuration(config)
+        logger.info(f"Updated optimization method to: {method.value}")
+    
+    def get_source_performance_summary(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get performance summary for all signal sources | 獲取所有信號來源的績效摘要
+        
+        Returns:
+            Performance summary by source | 按來源的績效摘要
+        """
+        summary = {}
+        
+        for source, metrics in self.weight_optimizer.source_metrics.items():
+            summary[source] = {
+                'current_weight': self.weights.get(source, 0.0),
+                'performance_metrics': metrics.to_dict(),
+                'optimization_score': self._calculate_optimization_score(metrics)
+            }
+        
+        return summary
+    
+    def _calculate_optimization_score(self, metrics) -> float:
+        """
+        Calculate overall optimization score for a source | 計算來源的整體優化評分
+        
+        Args:
+            metrics: Source performance metrics | 來源績效指標
+            
+        Returns:
+            Overall optimization score | 整體優化評分
+        """
+        if metrics.total_trades < 5:
+            return 0.5  # Neutral score for insufficient data
+        
+        # Combine multiple factors into optimization score | 將多個因子組合成優化評分
+        win_rate_score = metrics.win_rate
+        return_score = max(0.0, min(1.0, (metrics.avg_return + 0.5)))
+        consistency_score = metrics.confidence_score
+        recent_score = max(0.0, min(1.0, (metrics.recent_performance + 0.5)))
+        
+        optimization_score = (
+            win_rate_score * 0.3 +
+            return_score * 0.3 +
+            consistency_score * 0.2 +
+            recent_score * 0.2
+        )
+        
+        return min(1.0, max(0.0, optimization_score))
