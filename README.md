@@ -12,13 +12,46 @@
 **AIFX** is a professional quantitative trading system that implements medium-term forex strategies enhanced with AI models. The system focuses on EUR/USD and USD/JPY trading pairs using 1-hour timeframes.  
 **AIFX** 是一個專業的量化交易系統，實現結合AI模型的中期外匯策略。系統專注於歐元/美元和美元/日圓貨幣對，使用1小時時間框架。
 
+## 🎯 Development Status | 開發狀態
+
+```
+Phase 1: Infrastructure    ████████████████████ 100% ✅ COMPLETED
+Phase 2: AI Models         ████████████████████ 100% ✅ COMPLETED  
+Phase 3: Strategy          ░░░░░░░░░░░░░░░░░░░░   0% 🔄 NEXT
+Phase 4: Production        ░░░░░░░░░░░░░░░░░░░░   0% ⏳ PLANNED
+```
+
+**Latest Achievement: Phase 2 AI Model Development Completed**  
+**最新成就：第二階段AI模型開發已完成**
+
 ### Key Features | 主要功能
 
-- **Data & Feature Engineering | 數據與特徵工程**: Historical OHLCV data with technical indicators (MA, MACD, RSI, Bollinger Bands, ATR) | 歷史OHLCV數據配合技術指標（移動平均線、MACD、RSI、布林帶、ATR）
-- **AI Models | AI模型**: Machine learning models (XGBoost, Random Forest, LSTM) for price direction prediction | 機器學習模型（XGBoost、隨機森林、LSTM）用於價格方向預測
-- **Strategy Logic | 策略邏輯**: Combined technical and AI signals with confidence filtering | 結合技術和AI信號並進行信心過濾
-- **Risk Management | 風險管理**: Fixed percentage risk, stop-loss/take-profit using ATR multiples | 固定百分比風險、使用ATR倍數的止損/止盈
-- **Backtesting | 回測**: Backtrader framework with comprehensive performance metrics | Backtrader框架配合全面的績效指標
+- **Data & Feature Engineering | 數據與特徵工程**: ✅ Historical OHLCV data with technical indicators (MA, MACD, RSI, Bollinger Bands, ATR) | 歷史OHLCV數據配合技術指標（移動平均線、MACD、RSI、布林帶、ATR）
+- **AI Models | AI模型**: ✅ **IMPLEMENTED** - XGBoost, Random Forest, LSTM with training pipeline | **已實現** - XGBoost、隨機森林、LSTM配合訓練管道
+- **Strategy Logic | 策略邏輯**: 🔄 Combined technical and AI signals with confidence filtering | 結合技術和AI信號並進行信心過濾
+- **Risk Management | 風險管理**: 🔄 Fixed percentage risk, stop-loss/take-profit using ATR multiples | 固定百分比風險、使用ATR倍數的止損/止盈
+- **Backtesting | 回測**: 🔄 Backtrader framework with comprehensive performance metrics | Backtrader框架配合全面的績效指標
+
+## 🤖 AI Model Components (Phase 2 - Completed) | AI模型組件（第二階段 - 已完成）
+
+### **Implemented Models | 已實現模型**
+1. **XGBoost Classifier** - Gradient boosting with hyperparameter optimization | 梯度提升配合超參數優化
+   - Path: `src/main/python/models/xgboost_model.py`
+   - Features: GridSearch, feature importance, cross-validation | 網格搜索、特徵重要性、交叉驗證
+
+2. **Random Forest Ensemble** - Bootstrap aggregating with tree diversity analysis | 自助聚合配合樹多樣性分析
+   - Path: `src/main/python/models/random_forest_model.py`
+   - Features: OOB scoring, ensemble statistics, learning curves | OOB評分、集成統計、學習曲線
+
+3. **LSTM Neural Network** - Deep learning for time series prediction | 時間序列預測的深度學習
+   - Path: `src/main/python/models/lstm_model.py`
+   - Features: TensorFlow/Keras, sequence modeling, early stopping | TensorFlow/Keras、序列建模、早期停止
+
+### **Supporting Infrastructure | 支援基礎設施**
+- **Base Model Framework** (`base_model.py`) - Abstract classes and model registry | 抽象類和模型註冊表
+- **Training Pipeline** (`training/model_pipeline.py`) - Multi-model training and comparison | 多模型訓練和比較
+- **Performance Metrics** (`evaluation/performance_metrics.py`) - Trading-specific evaluation | 交易特定評估
+- **Model Management** (`services/model_manager.py`) - Versioning and deployment | 版本控制和部署
 
 ## AI/ML Project Structure | AI/ML 專案結構
 
@@ -69,6 +102,81 @@ AIFX/
 - **Scalable** - start simple, grow as needed | **可擴展** - 從簡單開始，按需增長
 - **Flexible** - choose complexity level based on project needs | **靈活性** - 根據專案需求選擇複雜度級別
 
+## 🚀 Installation & Setup | 安裝與設置
+
+### **Prerequisites | 前置條件**
+- Python 3.8+ (tested with 3.12) | Python 3.8+（已在3.12測試）
+- Git for version control | Git用於版本控制
+
+### **Installation Steps | 安裝步驟**
+
+1. **Clone repository | 克隆儲存庫**
+   ```bash
+   git clone https://github.com/LazOof69/AIFX.git
+   cd AIFX
+   ```
+
+2. **Create virtual environment | 創建虛擬環境**
+   ```bash
+   python -m venv aifx-venv
+   source aifx-venv/bin/activate  # Linux/Mac
+   # or
+   aifx-venv\Scripts\activate     # Windows
+   ```
+
+3. **Install dependencies | 安裝依賴項**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### **Key Dependencies Added in Phase 2 | 第二階段新增的關鍵依賴項**
+- `tensorflow>=2.10.0` - Deep learning framework for LSTM | LSTM的深度學習框架
+- `keras>=2.10.0` - High-level neural networks API | 高級神經網絡API
+- `xgboost>=1.6.0` - Gradient boosting framework | 梯度提升框架
+- `joblib>=1.1.0` - Model serialization | 模型序列化
+
+## 💡 Usage Examples | 使用範例
+
+### **Basic Model Training | 基礎模型訓練**
+
+```python
+from src.main.python.training.model_pipeline import ModelTrainingPipeline
+from src.main.python.models import XGBoostModel, RandomForestModel, LSTMModel
+
+# Initialize training pipeline | 初始化訓練管道
+pipeline = ModelTrainingPipeline()
+
+# Prepare your forex data | 準備外匯數據
+# data = load_forex_data()  # Your data loading logic
+
+# Train multiple models | 訓練多個模型
+results = pipeline.train_multiple_models(
+    data_splits=data_splits,
+    model_types=['xgboost', 'random_forest', 'lstm'],
+    optimize_hyperparameters=True
+)
+
+# Compare model performance | 比較模型性能
+best_model = results['best_model']
+print(f"Best performing model: {best_model['model_type']}")
+```
+
+### **Individual Model Usage | 單個模型使用**
+
+```python
+# XGBoost Example | XGBoost示例
+from src.main.python.models.xgboost_model import XGBoostModel
+
+model = XGBoostModel()
+training_history = model.train(X_train, y_train, X_val, y_val)
+predictions = model.predict(X_test)
+probabilities = model.predict_proba(X_test)
+
+# Get feature importance | 獲取特徵重要性
+importance = model.get_feature_importance()
+model.plot_feature_importance(top_n=20)
+```
+
 ## Trading Strategy Requirements | 交易策略需求
 
 ### Fixed Conditions | 固定條件
@@ -76,9 +184,9 @@ AIFX/
 - **Timeframe | 時間框架**: 1-hour (H1) | 1小時 (H1)
 
 ### Implementation Areas | 實施領域
-1. **Data & Feature Engineering | 數據與特徵工程** - OHLCV data with technical indicators | OHLCV數據配合技術指標
-2. **AI Model | AI模型** - ML/DL models for direction prediction | ML/DL模型用於方向預測
-3. **Strategy Logic | 策略邏輯** - Combined technical + AI signals | 結合技術+AI信號
-4. **Risk Management | 風險管理** - Fixed % risk, stop-loss/take-profit | 固定%風險、止損/止盈
-5. **Backtesting | 回測** - 2-3 years historical data analysis | 2-3年歷史數據分析
-6. **Performance Evaluation | 績效評估** - Win rate, profit factor, drawdown, Sharpe ratio | 勝率、盈利因子、回撤、夏普比率
+1. **Data & Feature Engineering | 數據與特徵工程** - ✅ COMPLETED | 已完成
+2. **AI Model | AI模型** - ✅ COMPLETED | 已完成  
+3. **Strategy Logic | 策略邏輯** - 🔄 Phase 3 Target | 第三階段目標
+4. **Risk Management | 風險管理** - 🔄 Phase 3 Target | 第三階段目標
+5. **Backtesting | 回測** - 🔄 Phase 3 Target | 第三階段目標
+6. **Performance Evaluation | 績效評估** - ✅ Framework Ready | 框架就緒
