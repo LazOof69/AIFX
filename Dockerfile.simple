@@ -1,7 +1,7 @@
-# AIFX - AI-Enhanced Forex Trading System
-# Multi-stage Docker build for production deployment
-# AIFX - AI增強外匯交易系統
-# 生產部署的多階段Docker構建
+# AIFX - Simple AI-Enhanced Forex Trading System
+# Simplified Docker build without SQL Server dependencies
+# AIFX - 簡化版AI增強外匯交易系統
+# 無SQL Server依賴的簡化Docker構建
 
 # ============================================================================
 # Stage 1: Base Python Environment | 第一階段：基礎Python環境
@@ -24,17 +24,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
-    gnupg2 \
-    unixodbc \
-    unixodbc-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Microsoft ODBC Driver for SQL Server | 安裝 Microsoft ODBC SQL Server 驅動程式
-RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
-    && echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list \
-    && apt-get update \
-    && ACCEPT_EULA=Y apt-get install -y msodbcsql18 || echo "ODBC driver installation failed, continuing without it" \
-    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Create application user | 創建應用程式用戶
@@ -132,8 +121,8 @@ CMD ["python", "-m", "pytest", "src/test/", "-v", "--cov=src"]
 # Labels and Metadata | 標籤和元數據
 # ============================================================================
 LABEL maintainer="AIFX Development Team" \
-      version="4.0.0" \
-      description="AI-Enhanced Forex Trading System - Production Ready" \
+      version="4.0.1" \
+      description="AI-Enhanced Forex Trading System - Simplified Build" \
       org.opencontainers.image.source="https://github.com/LazOof69/AIFX" \
       org.opencontainers.image.documentation="https://github.com/LazOof69/AIFX/blob/main/README.md" \
       org.opencontainers.image.licenses="MIT"

@@ -1,11 +1,11 @@
-# Free Deployment Docker Compose
-# 免費部署 Docker Compose 配置
+# Simple AIFX Deployment
+# 簡化 AIFX 部署
 
 services:
   aifx-web:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.simple
       target: production
     ports:
       - "8000:8000"

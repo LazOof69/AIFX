@@ -111,7 +111,7 @@ experiments/results/
 docker-compose.override.yml
 .dockerignore
 docker-compose.dev.yml
-docker/
+# docker/ - REMOVED: Need entrypoint.sh for container builds
 
 # ============================================================================
 # Environment Variables | 環境變數
