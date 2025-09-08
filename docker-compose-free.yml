@@ -7,7 +7,10 @@ services:
   aifx-web:
     build:
       context: .
+      dockerfile: Dockerfile
       target: production
+    env_file:
+      - .env.docker
     ports:
       - "8000:8000"
     environment:
