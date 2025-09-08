@@ -108,15 +108,14 @@ COPY requirements-test.txt .
 RUN pip install --no-cache-dir -r requirements-test.txt
 
 # Copy test files | 複製測試文件
-COPY --chown=aifx:aifx tests/ ./tests/
+COPY --chown=aifx:aifx src/test/ ./src/test/
 COPY --chown=aifx:aifx pytest.ini .
-COPY --chown=aifx:aifx .coverage.ini .
 
 # Set testing environment | 設置測試環境
 ENV AIFX_ENV=testing
 
 # Testing entrypoint | 測試入口點
-CMD ["python", "-m", "pytest", "tests/", "-v", "--cov=src"]
+CMD ["python", "-m", "pytest", "src/test/", "-v", "--cov=src"]
 
 # ============================================================================
 # Labels and Metadata | 標籤和元數據
