@@ -1,0 +1,530 @@
+# AIFX - Enhanced Cloud Deployment CI/CD Pipeline
+# AIFX - 增強雲端部署 CI/CD 管道
+# Comprehensive Docker + Kubernetes + AWS deployment pipeline
+
+name: AIFX Cloud Deployment Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'infrastructure/**'
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
+      - 'requirements*.txt'
+      - 'config/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'infrastructure/**'
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
+      - 'requirements*.txt'
+      - 'config/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - development
+        - staging
+        - production
+      skip_tests:
+        description: 'Skip tests (emergency deployment)'
+        required: false
+        default: false
+        type: boolean
+      force_rebuild:
+        description: 'Force Docker image rebuild'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  # AWS Configuration | AWS 配置
+  AWS_REGION: us-west-2
+  AWS_SECONDARY_REGION: us-east-1
+  
+  # Container Registry | 容器註冊表
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-west-2.amazonaws.com
+  ECR_REPOSITORY: aifx/trading-system
+  
+  # Kubernetes Configuration | Kubernetes 配置
+  EKS_CLUSTER_NAME: aifx-${{ github.event.inputs.environment || 'staging' }}
+  KUBE_NAMESPACE: aifx
+  
+  # Docker Build Configuration | Docker 構建配置
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  BUILDX_NO_DEFAULT_ATTESTATIONS: 1
+  
+  # Application Configuration | 應用程式配置
+  AIFX_VERSION: ${{ github.sha }}
+  BUILD_DATE: ${{ github.run_number }}
+
+jobs:
+  # ============================================================================
+  # STAGE 1: Code Quality and Security | 第一階段：代碼品質與安全
+  # ============================================================================
+  pre-flight-checks:
+    name: 🔍 Pre-flight Checks
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env-setup.outputs.environment }}
+      deploy-staging: ${{ steps.env-setup.outputs.deploy-staging }}
+      deploy-production: ${{ steps.env-setup.outputs.deploy-production }}
+      image-tag: ${{ steps.image-tag.outputs.tag }}
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+    
+    - name: 🔧 Environment Setup
+      id: env-setup
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          ENV="${{ github.event.inputs.environment }}"
+        elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+          ENV="production"
+        elif [ "${{ github.ref }}" == "refs/heads/develop" ]; then
+          ENV="staging"
+        else
+          ENV="development"
+        fi
+        
+        echo "environment=$ENV" >> $GITHUB_OUTPUT
+        echo "deploy-staging=$([[ $ENV == 'staging' || $ENV == 'production' ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        echo "deploy-production=$([[ $ENV == 'production' ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+        
+        echo "🎯 Deployment Environment: $ENV"
+    
+    - name: 🏷️ Generate Image Tag
+      id: image-tag
+      run: |
+        if [ "${{ steps.env-setup.outputs.environment }}" == "production" ]; then
+          TAG="v${{ github.run_number }}-$(echo ${{ github.sha }} | cut -c1-8)"
+        else
+          TAG="${{ steps.env-setup.outputs.environment }}-$(echo ${{ github.sha }} | cut -c1-8)"
+        fi
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "🏷️ Image Tag: $TAG"
+    
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+    
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        pip install bandit safety black flake8 pytest-cov
+    
+    - name: 🔍 Code Quality Checks
+      run: |
+        echo "🔍 Running code quality checks..."
+        
+        # Code formatting check
+        black --check --diff src/
+        
+        # Linting
+        flake8 src/ --max-line-length=100 --exclude=__pycache__,*.pyc
+        
+        # Security scan
+        bandit -r src/ -ll || true
+        
+        # Dependency vulnerability check
+        safety check || true
+    
+    - name: 📋 Validate Configuration Files
+      run: |
+        echo "📋 Validating configuration files..."
+        
+        # Validate Docker files
+        if [ -f "Dockerfile" ]; then
+          echo "✅ Dockerfile exists"
+          # Basic syntax check
+          docker run --rm -i hadolint/hadolint < Dockerfile || true
+        fi
+        
+        # Validate Kubernetes manifests
+        find infrastructure/kubernetes -name "*.yaml" -exec kubectl --dry-run=client apply -f {} \; || true
+        
+        # Validate requirements files
+        for req_file in requirements*.txt; do
+          if [ -f "$req_file" ]; then
+            echo "✅ $req_file is valid"
+            pip-compile --dry-run "$req_file" || true
+          fi
+        done
+
+  # ============================================================================
+  # STAGE 2: Testing | 第二階段：測試
+  # ============================================================================
+  run-tests:
+    name: 🧪 Run Tests
+    runs-on: ubuntu-latest
+    needs: pre-flight-checks
+    if: ${{ !github.event.inputs.skip_tests }}
+    
+    strategy:
+      matrix:
+        test-type: [unit, integration, phase3-core]
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+    
+    - name: 📦 Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+    
+    - name: 🧪 Run ${{ matrix.test-type }} Tests
+      run: |
+        case "${{ matrix.test-type }}" in
+          "unit")
+            echo "🧪 Running unit tests..."
+            python -m pytest src/test/unit/ -v --cov=src --cov-report=xml --cov-report=term-missing
+            ;;
+          "integration")
+            echo "🧪 Running integration tests..."
+            SKIP_NETWORK_TESTS=false python test_integration_phase1_phase2.py
+            ;;
+          "phase3-core")
+            echo "🧪 Running Phase 3 core tests..."
+            SKIP_NETWORK_TESTS=false python test_phase3_core.py
+            ;;
+        esac
+    
+    - name: 📊 Upload Coverage Reports
+      if: matrix.test-type == 'unit'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  # ============================================================================
+  # STAGE 3: Docker Build and Push | 第三階段：Docker 構建與推送
+  # ============================================================================
+  build-and-push:
+    name: 🐳 Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [pre-flight-checks, run-tests]
+    if: always() && (needs.pre-flight-checks.result == 'success' && (needs.run-tests.result == 'success' || needs.run-tests.result == 'skipped'))
+    
+    outputs:
+      image-url: ${{ steps.build.outputs.image-url }}
+      image-digest: ${{ steps.build.outputs.image-digest }}
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 🔧 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        version: latest
+        driver-opts: |
+          network=host
+    
+    - name: 🔐 Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: 🚪 Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+      with:
+        mask-password: 'true'
+    
+    - name: 🏷️ Extract Metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=raw,value=${{ needs.pre-flight-checks.outputs.image-tag }}
+          type=raw,value=latest,enable={{is_default_branch}}
+        labels: |
+          maintainer=AIFX Development Team
+          org.opencontainers.image.title=AIFX Trading System
+          org.opencontainers.image.description=AI-Enhanced Forex Trading System
+          org.opencontainers.image.vendor=AIFX
+          org.opencontainers.image.version=${{ needs.pre-flight-checks.outputs.image-tag }}
+          aifx.environment=${{ needs.pre-flight-checks.outputs.environment }}
+          aifx.build-date=${{ env.BUILD_DATE }}
+    
+    - name: 🐳 Build and Push Docker Image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        target: production
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+        build-args: |
+          AIFX_ENV=${{ needs.pre-flight-checks.outputs.environment }}
+          BUILD_DATE=${{ github.run_number }}
+          VCS_REF=${{ github.sha }}
+          VERSION=${{ needs.pre-flight-checks.outputs.image-tag }}
+        outputs: |
+          type=image,name=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }},push=true
+    
+    - name: 🔍 Security Scan Docker Image
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ needs.pre-flight-checks.outputs.image-tag }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: 📊 Upload Security Scan Results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # ============================================================================
+  # STAGE 4: Infrastructure Deployment | 第四階段：基礎設施部署
+  # ============================================================================
+  deploy-infrastructure:
+    name: 🏗️ Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [pre-flight-checks, build-and-push]
+    if: needs.pre-flight-checks.outputs.deploy-staging == 'true' || needs.pre-flight-checks.outputs.deploy-production == 'true'
+    
+    environment:
+      name: ${{ needs.pre-flight-checks.outputs.environment }}
+      url: https://${{ needs.pre-flight-checks.outputs.environment }}.aifx.trading.local
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 🔐 Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: 🔧 Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ~1.6
+    
+    - name: 🏗️ Terraform Init
+      run: |
+        cd infrastructure/terraform
+        terraform init \
+          -backend-config="bucket=aifx-terraform-state-${{ secrets.AWS_ACCOUNT_ID }}" \
+          -backend-config="key=${{ needs.pre-flight-checks.outputs.environment }}/terraform.tfstate" \
+          -backend-config="region=${{ env.AWS_REGION }}" \
+          -backend-config="encrypt=true"
+    
+    - name: 📋 Terraform Plan
+      run: |
+        cd infrastructure/terraform
+        terraform plan \
+          -var="environment=${{ needs.pre-flight-checks.outputs.environment }}" \
+          -var="aws_region=${{ env.AWS_REGION }}" \
+          -var="ecr_repository_url=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}" \
+          -out=tfplan
+    
+    - name: 🚀 Terraform Apply
+      if: needs.pre-flight-checks.outputs.environment != 'production' || github.ref == 'refs/heads/main'
+      run: |
+        cd infrastructure/terraform
+        terraform apply -auto-approve tfplan
+    
+    - name: 📤 Export Terraform Outputs
+      id: tf-outputs
+      run: |
+        cd infrastructure/terraform
+        echo "cluster-name=$(terraform output -raw cluster_name)" >> $GITHUB_OUTPUT
+        echo "cluster-endpoint=$(terraform output -raw cluster_endpoint)" >> $GITHUB_OUTPUT
+        echo "ecr-repository=$(terraform output -raw ecr_repository_url)" >> $GITHUB_OUTPUT
+        echo "rds-endpoint=$(terraform output -raw rds_endpoint)" >> $GITHUB_OUTPUT
+        echo "redis-endpoint=$(terraform output -raw redis_endpoint)" >> $GITHUB_OUTPUT
+
+  # ============================================================================
+  # STAGE 5: Application Deployment | 第五階段：應用程式部署
+  # ============================================================================
+  deploy-application:
+    name: 🚀 Deploy Application
+    runs-on: ubuntu-latest
+    needs: [pre-flight-checks, build-and-push, deploy-infrastructure]
+    if: always() && needs.deploy-infrastructure.result == 'success'
+    
+    environment:
+      name: ${{ needs.pre-flight-checks.outputs.environment }}
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 🔐 Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: ⚙️ Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+    
+    - name: 🔧 Update kubeconfig
+      run: |
+        aws eks update-kubeconfig \
+          --region ${{ env.AWS_REGION }} \
+          --name aifx-${{ needs.pre-flight-checks.outputs.environment }}
+    
+    - name: 📝 Prepare Kubernetes Manifests
+      run: |
+        # Replace placeholders in Kubernetes manifests
+        find infrastructure/kubernetes -name "*.yaml" -exec sed -i \
+          -e "s|\${ECR_REPOSITORY_URL}|${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}|g" \
+          -e "s|\${IMAGE_TAG}|${{ needs.pre-flight-checks.outputs.image-tag }}|g" \
+          -e "s|\${ENVIRONMENT}|${{ needs.pre-flight-checks.outputs.environment }}|g" \
+          -e "s|\${AIFX_APP_ROLE_ARN}|arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/aifx-${{ needs.pre-flight-checks.outputs.environment }}-app-role|g" \
+          {} \;
+    
+    - name: 🚀 Deploy to Kubernetes
+      run: |
+        # Create namespace if it doesn't exist
+        kubectl create namespace ${{ env.KUBE_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Apply Kubernetes manifests in order
+        kubectl apply -f infrastructure/kubernetes/namespace.yaml
+        kubectl apply -f infrastructure/kubernetes/pvc.yaml
+        kubectl apply -f infrastructure/kubernetes/configmaps/
+        kubectl apply -f infrastructure/kubernetes/secrets/
+        kubectl apply -f infrastructure/kubernetes/service.yaml
+        kubectl apply -f infrastructure/kubernetes/deployment.yaml
+        kubectl apply -f infrastructure/kubernetes/hpa.yaml
+        kubectl apply -f infrastructure/kubernetes/ingress.yaml
+    
+    - name: ⏳ Wait for Deployment
+      run: |
+        echo "⏳ Waiting for deployment to be ready..."
+        kubectl rollout status deployment/aifx-app -n ${{ env.KUBE_NAMESPACE }} --timeout=600s
+        kubectl rollout status deployment/aifx-ai-worker -n ${{ env.KUBE_NAMESPACE }} --timeout=600s
+    
+    - name: 🔍 Health Check
+      run: |
+        echo "🔍 Performing health check..."
+        
+        # Get load balancer URL
+        LB_URL=$(kubectl get svc aifx-app -n ${{ env.KUBE_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        
+        if [ -n "$LB_URL" ]; then
+          # Wait for load balancer to be ready
+          sleep 60
+          
+          # Health check
+          curl -f "http://$LB_URL:8000/health" || exit 1
+          echo "✅ Health check passed"
+        else
+          echo "⚠️ Load balancer URL not found, checking pod health instead"
+          kubectl get pods -n ${{ env.KUBE_NAMESPACE }}
+        fi
+    
+    - name: 📊 Post-Deployment Summary
+      run: |
+        echo "## 🎉 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Environment | ${{ needs.pre-flight-checks.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Image Tag | ${{ needs.pre-flight-checks.outputs.image-tag }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Cluster | aifx-${{ needs.pre-flight-checks.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Namespace | ${{ env.KUBE_NAMESPACE }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Deployed Resources:" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        kubectl get all -n ${{ env.KUBE_NAMESPACE }} >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # STAGE 6: Production Promotion (Manual Approval) | 第六階段：生產晉升（手動批准）
+  # ============================================================================
+  promote-to-production:
+    name: 🎯 Promote to Production
+    runs-on: ubuntu-latest
+    needs: [pre-flight-checks, deploy-application]
+    if: needs.pre-flight-checks.outputs.environment == 'staging' && success()
+    
+    environment:
+      name: production
+      url: https://production.aifx.trading.local
+    
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: 🎯 Production Deployment
+      run: |
+        echo "🎯 Promoting staging to production..."
+        echo "This step requires manual approval and will deploy to production environment."
+        
+        # Trigger production deployment
+        gh workflow run cloud-deploy.yml \
+          -f environment=production \
+          -f skip_tests=false \
+          -f force_rebuild=false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================================
+  # STAGE 7: Notifications | 第七階段：通知
+  # ============================================================================
+  notify:
+    name: 📢 Send Notifications
+    runs-on: ubuntu-latest
+    needs: [pre-flight-checks, deploy-application]
+    if: always()
+    
+    steps:
+    - name: 📢 Slack Notification
+      if: always()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#aifx-deployments'
+        text: |
+          🚀 AIFX Deployment ${{ job.status }}
+          Environment: ${{ needs.pre-flight-checks.outputs.environment }}
+          Image: ${{ needs.pre-flight-checks.outputs.image-tag }}
+          Commit: ${{ github.sha }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,0 +1,211 @@
+# AIFX - Persistent Volume Claims for Cloud Storage Integration
+# AIFX - 雲端存儲整合的持久卷聲明
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aifx-models-pvc
+  namespace: aifx
+  labels:
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: aifx-trading-system
+    storage-type: models
+  annotations:
+    description: "Persistent storage for AI models and trained models"
+    volume.beta.kubernetes.io/storage-class: "gp3"
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 100Gi
+  volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aifx-data-pvc
+  namespace: aifx
+  labels:
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: aifx-trading-system
+    storage-type: data
+  annotations:
+    description: "Persistent storage for trading data and market data"
+    volume.beta.kubernetes.io/storage-class: "gp3"
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 200Gi
+  volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aifx-output-pvc
+  namespace: aifx
+  labels:
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: aifx-trading-system
+    storage-type: output
+  annotations:
+    description: "Persistent storage for output files, reports, and backups"
+    volume.beta.kubernetes.io/storage-class: "gp3"
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 50Gi
+  volumeMode: Filesystem
+
+---
+# EFS Storage Class for shared file system access across pods
+# EFS 存儲類別，支援跨 Pod 的共享檔案系統存取
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-sc
+  labels:
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/component: storage-class
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: ${EFS_FILE_SYSTEM_ID}
+  directoryPerms: "0755"
+  gidRangeStart: "1000"
+  gidRangeEnd: "2000"
+  basePath: "/aifx"
+mountOptions:
+  - tls
+  - regional
+  - iam
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+
+---
+# Service Account for AIFX applications with IAM role binding
+# AIFX 應用程式的服務帳戶，配合 IAM 角色綁定
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aifx-service-account
+  namespace: aifx
+  labels:
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/instance: aifx
+    app.kubernetes.io/component: service-account
+    app.kubernetes.io/part-of: aifx-trading-system
+  annotations:
+    eks.amazonaws.com/role-arn: ${AIFX_APP_ROLE_ARN}
+    description: "Service account for AIFX applications with AWS IAM permissions"
+automountServiceAccountToken: true
+
+---
+# Role for AIFX applications within Kubernetes cluster
+# AIFX 應用程式在 Kubernetes 集群內的角色
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: aifx-app-role
+  namespace: aifx
+  labels:
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/component: rbac
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: aifx-app-rolebinding
+  namespace: aifx
+  labels:
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/component: rbac
+subjects:
+- kind: ServiceAccount
+  name: aifx-service-account
+  namespace: aifx
+roleRef:
+  kind: Role
+  name: aifx-app-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Network Policy for AIFX applications
+# AIFX 應用程式的網絡策略
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: aifx-network-policy
+  namespace: aifx
+  labels:
+    app.kubernetes.io/name: aifx
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: aifx
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: aifx
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: aifx-trading-system
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8001
+    - protocol: TCP
+      port: 8002
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8000  # Allow external access to main app
+  egress:
+  - to: []  # Allow all outbound traffic for now
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 443   # HTTPS for AWS APIs
+    - protocol: TCP
+      port: 80    # HTTP
+    - protocol: UDP
+      port: 53    # DNS

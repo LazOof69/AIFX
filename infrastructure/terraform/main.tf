@@ -370,6 +370,285 @@ resource "aws_elasticache_replication_group" "aifx" {
 }
 
 # ============================================================================
+# ECR Container Registry | ECR 容器註冊表
+# ============================================================================
+
+resource "aws_ecr_repository" "aifx" {
+  name                 = "aifx/trading-system"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+
+  tags = local.tags
+}
+
+resource "aws_ecr_lifecycle_policy" "aifx" {
+  repository = aws_ecr_repository.aifx.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep last 30 production images"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["v", "release"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 30
+        }
+        action = {
+          type = "expire"
+        }
+      },
+      {
+        rulePriority = 2
+        description  = "Keep last 10 development images"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["dev", "feature", "main"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 10
+        }
+        action = {
+          type = "expire"
+        }
+      },
+      {
+        rulePriority = 3
+        description  = "Delete untagged images older than 1 day"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 1
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+# ============================================================================
+# S3 Buckets for Storage | S3 存儲桶
+# ============================================================================
+
+# S3 bucket for AI models storage | AI模型存儲的S3桶
+resource "aws_s3_bucket" "aifx_models" {
+  bucket = "${local.name}-models-${random_string.bucket_suffix.result}"
+
+  tags = merge(local.tags, {
+    Name        = "${local.name}-models"
+    Description = "AI Models Storage for AIFX"
+  })
+}
+
+resource "aws_s3_bucket_versioning" "aifx_models" {
+  bucket = aws_s3_bucket.aifx_models.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_encryption" "aifx_models" {
+  bucket = aws_s3_bucket.aifx_models.id
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "aifx_models" {
+  bucket = aws_s3_bucket.aifx_models.id
+
+  rule {
+    id     = "model_lifecycle"
+    status = "Enabled"
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 365
+    }
+  }
+}
+
+# S3 bucket for data backups | 數據備份的S3桶
+resource "aws_s3_bucket" "aifx_backups" {
+  bucket = "${local.name}-backups-${random_string.bucket_suffix.result}"
+
+  tags = merge(local.tags, {
+    Name        = "${local.name}-backups"
+    Description = "Database and Application Backups for AIFX"
+  })
+}
+
+resource "aws_s3_bucket_versioning" "aifx_backups" {
+  bucket = aws_s3_bucket.aifx_backups.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_encryption" "aifx_backups" {
+  bucket = aws_s3_bucket.aifx_backups.id
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+}
+
+# S3 bucket for trading data | 交易數據的S3桶
+resource "aws_s3_bucket" "aifx_data" {
+  bucket = "${local.name}-data-${random_string.bucket_suffix.result}"
+
+  tags = merge(local.tags, {
+    Name        = "${local.name}-data"
+    Description = "Trading Data Storage for AIFX"
+  })
+}
+
+resource "aws_s3_bucket_versioning" "aifx_data" {
+  bucket = aws_s3_bucket.aifx_data.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_encryption" "aifx_data" {
+  bucket = aws_s3_bucket.aifx_data.id
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+}
+
+resource "random_string" "bucket_suffix" {
+  length  = 8
+  special = false
+  upper   = false
+}
+
+# ============================================================================
+# IAM Roles for EKS and Applications | EKS 和應用程式的 IAM 角色
+# ============================================================================
+
+# IAM role for AIFX application pods | AIFX應用程式Pod的IAM角色
+resource "aws_iam_role" "aifx_app_role" {
+  name = "${local.name}-app-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Effect = "Allow"
+        Principal = {
+          Federated = module.eks.oidc_provider_arn
+        }
+        Condition = {
+          StringEquals = {
+            "${module.eks.oidc_provider}:sub": "system:serviceaccount:aifx:aifx-app"
+            "${module.eks.oidc_provider}:aud": "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = local.tags
+}
+
+# Policy for S3 access | S3訪問策略
+resource "aws_iam_policy" "aifx_s3_policy" {
+  name        = "${local.name}-s3-policy"
+  description = "IAM policy for AIFX S3 access"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.aifx_models.arn,
+          "${aws_s3_bucket.aifx_models.arn}/*",
+          aws_s3_bucket.aifx_data.arn,
+          "${aws_s3_bucket.aifx_data.arn}/*",
+          aws_s3_bucket.aifx_backups.arn,
+          "${aws_s3_bucket.aifx_backups.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
+# Policy for ECR access | ECR訪問策略
+resource "aws_iam_policy" "aifx_ecr_policy" {
+  name        = "${local.name}-ecr-policy"
+  description = "IAM policy for AIFX ECR access"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Attach policies to the role | 將策略附加到角色
+resource "aws_iam_role_policy_attachment" "aifx_s3_attach" {
+  role       = aws_iam_role.aifx_app_role.name
+  policy_arn = aws_iam_policy.aifx_s3_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "aifx_ecr_attach" {
+  role       = aws_iam_role.aifx_app_role.name
+  policy_arn = aws_iam_policy.aifx_ecr_policy.arn
+}
+
+# ============================================================================
 # Application Load Balancer | 應用負載均衡器
 # ============================================================================
 
@@ -402,4 +681,121 @@ resource "aws_security_group" "alb" {
   tags = merge(local.tags, {
     Name = "${local.name}-alb"
   })
+}
+
+resource "aws_lb" "aifx" {
+  name               = local.name
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = module.vpc.public_subnets
+
+  enable_deletion_protection = var.environment == "production"
+
+  tags = local.tags
+}
+
+resource "aws_lb_target_group" "aifx" {
+  name     = "${local.name}-tg"
+  port     = 8000
+  protocol = "HTTP"
+  vpc_id   = module.vpc.vpc_id
+  target_type = "ip"
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    matcher             = "200"
+    path                = "/health"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    timeout             = 5
+    unhealthy_threshold = 2
+  }
+
+  tags = local.tags
+}
+
+resource "aws_lb_listener" "aifx" {
+  load_balancer_arn = aws_lb.aifx.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.aifx.arn
+  }
+
+  tags = local.tags
+}
+
+# ============================================================================
+# CloudWatch Log Groups | CloudWatch 日誌組
+# ============================================================================
+
+resource "aws_cloudwatch_log_group" "aifx" {
+  name              = "/aws/eks/${local.name}/aifx"
+  retention_in_days = var.environment == "production" ? 30 : 7
+
+  tags = local.tags
+}
+
+resource "aws_cloudwatch_log_group" "aifx_application" {
+  name              = "/aws/eks/${local.name}/aifx-application"
+  retention_in_days = var.environment == "production" ? 30 : 7
+
+  tags = local.tags
+}
+
+# ============================================================================
+# AWS Systems Manager Parameters | AWS 系統管理器參數
+# ============================================================================
+
+resource "aws_ssm_parameter" "db_endpoint" {
+  name  = "/${local.name}/database/endpoint"
+  type  = "String"
+  value = aws_db_instance.aifx.endpoint
+
+  tags = local.tags
+}
+
+resource "aws_ssm_parameter" "redis_endpoint" {
+  name  = "/${local.name}/redis/endpoint"
+  type  = "String"
+  value = aws_elasticache_replication_group.aifx.configuration_endpoint_address
+
+  tags = local.tags
+}
+
+resource "aws_ssm_parameter" "ecr_repository" {
+  name  = "/${local.name}/ecr/repository"
+  type  = "String"
+  value = aws_ecr_repository.aifx.repository_url
+
+  tags = local.tags
+}
+
+resource "aws_ssm_parameter" "s3_models_bucket" {
+  name  = "/${local.name}/s3/models-bucket"
+  type  = "String"
+  value = aws_s3_bucket.aifx_models.id
+
+  tags = local.tags
+}
+
+resource "aws_ssm_parameter" "s3_data_bucket" {
+  name  = "/${local.name}/s3/data-bucket"
+  type  = "String"
+  value = aws_s3_bucket.aifx_data.id
+
+  tags = local.tags
+}
+
+resource "aws_ssm_parameter" "s3_backups_bucket" {
+  name  = "/${local.name}/s3/backups-bucket"
+  type  = "String"
+  value = aws_s3_bucket.aifx_backups.id
+
+  tags = local.tags
 }

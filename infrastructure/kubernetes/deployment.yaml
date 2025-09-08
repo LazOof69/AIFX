@@ -56,7 +56,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: aifx-app
-        image: aifx:latest  # Will be replaced with actual registry URL
+        image: ${ECR_REPOSITORY_URL}/aifx/trading-system:${IMAGE_TAG}
         imagePullPolicy: Always
         ports:
         - name: http
@@ -68,6 +68,13 @@ spec:
         env:
         - name: AIFX_ENV
           value: "production"
+        - name: PYTHONPATH
+          value: "/app:/app/src/main/python"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: TZ
+          value: "UTC"
+        # Database Configuration (RDS) | 資料庫配置 (RDS)
         - name: POSTGRES_HOST
           valueFrom:
             secretKeyRef:
@@ -88,23 +95,49 @@ spec:
             secretKeyRef:
               name: aifx-secrets
               key: postgres-password
+        # Redis Configuration (ElastiCache) | Redis配置 (ElastiCache)
         - name: REDIS_HOST
           valueFrom:
             secretKeyRef:
               name: aifx-secrets
               key: redis-host
-        - name: MONGODB_HOST
+        - name: REDIS_PORT
+          value: "6379"
+        # S3 Storage Configuration | S3存儲配置
+        - name: AWS_DEFAULT_REGION
+          value: "us-west-2"
+        - name: S3_MODELS_BUCKET
           valueFrom:
-            secretKeyRef:
-              name: aifx-secrets
-              key: mongodb-host
+            configMapKeyRef:
+              name: aifx-config
+              key: s3-models-bucket
+        - name: S3_DATA_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: aifx-config
+              key: s3-data-bucket
+        - name: S3_BACKUPS_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: aifx-config
+              key: s3-backups-bucket
+        # Application Configuration | 應用程式配置
         - name: LOG_LEVEL
           valueFrom:
             configMapKeyRef:
               name: aifx-config
               key: log-level
+        - name: MAX_WORKERS
+          value: "4"
+        - name: WORKER_CONNECTIONS
+          value: "1000"
         - name: PROMETHEUS_MULTIPROC_DIR
           value: "/tmp/prometheus_multiproc"
+        # Health Check Configuration | 健康檢查配置
+        - name: HEALTH_CHECK_INTERVAL
+          value: "30"
+        - name: HEALTH_CHECK_TIMEOUT
+          value: "10"
         envFrom:
         - configMapRef:
             name: aifx-config
@@ -147,13 +180,16 @@ spec:
           successThreshold: 1
         volumeMounts:
         - name: config
-          mountPath: /home/aifx/app/config
+          mountPath: /app/config
           readOnly: true
         - name: logs
-          mountPath: /home/aifx/app/logs
+          mountPath: /app/logs
         - name: models
-          mountPath: /home/aifx/app/models
-          readOnly: true
+          mountPath: /app/models
+        - name: data
+          mountPath: /app/data
+        - name: output
+          mountPath: /app/output
         - name: tmp
           mountPath: /tmp
         - name: prometheus-multiproc
@@ -180,6 +216,12 @@ spec:
       - name: models
         persistentVolumeClaim:
           claimName: aifx-models-pvc
+      - name: data
+        persistentVolumeClaim:
+          claimName: aifx-data-pvc
+      - name: output
+        persistentVolumeClaim:
+          claimName: aifx-output-pvc
       - name: tmp
         emptyDir:
           sizeLimit: 1Gi
@@ -271,7 +313,7 @@ spec:
         runAsGroup: 1000
       containers:
       - name: aifx-ai-worker
-        image: aifx:latest  # Will be replaced with actual registry URL
+        image: ${ECR_REPOSITORY_URL}/aifx/trading-system:${IMAGE_TAG}
         imagePullPolicy: Always
         command: ["python", "-m", "src.main.python.workers.ai_worker"]
         ports:

@@ -1,0 +1,447 @@
+# AIFX Cloud Production Configuration | AIFX 雲端生產配置
+# Enhanced configuration for cloud-native deployment with AWS services
+# 使用 AWS 服務的雲端原生部署增強配置
+
+# ============================================================================
+# APPLICATION CONFIGURATION | 應用程式配置
+# ============================================================================
+app:
+  name: "AIFX Trading System"
+  version: "4.1.2"
+  environment: "production"
+  debug: false
+  timezone: "UTC"
+  
+  # Cloud-native performance settings | 雲端原生性能設置
+  max_workers: 8
+  worker_connections: 2000
+  request_timeout: 30
+  keep_alive: 2
+  
+  # Security settings | 安全設置
+  secret_key: "${AIFX_SECRET_KEY}"
+  cors_origins: []
+  allowed_hosts: 
+    - "production.aifx.trading.local"
+    - "*.elb.amazonaws.com"
+    - "localhost"
+  
+  # Container-specific settings | 容器特定設置
+  container:
+    name: "aifx-trading-system"
+    registry: "${ECR_REGISTRY}"
+    image_tag: "${IMAGE_TAG}"
+    health_check_path: "/health"
+    metrics_path: "/metrics"
+
+# ============================================================================
+# CLOUD STORAGE CONFIGURATION | 雲端存儲配置
+# ============================================================================
+storage:
+  # AWS S3 Storage | AWS S3 存儲
+  s3:
+    region: "us-west-2"
+    
+    # AI Models storage | AI模型存儲
+    models_bucket: "${S3_MODELS_BUCKET}"
+    models_prefix: "models/"
+    models_cache_ttl: 3600  # 1 hour
+    
+    # Trading data storage | 交易數據存儲
+    data_bucket: "${S3_DATA_BUCKET}"
+    data_prefix: "trading-data/"
+    data_retention_days: 365
+    
+    # Backup storage | 備份存儲
+    backups_bucket: "${S3_BACKUPS_BUCKET}"
+    backups_prefix: "backups/"
+    backup_retention_days: 90
+    
+    # Performance settings | 性能設置
+    multipart_threshold: 67108864  # 64MB
+    max_concurrency: 10
+    max_bandwidth: 104857600  # 100MB/s
+    
+    # Encryption settings | 加密設置
+    encryption: "AES256"
+    kms_key_id: "${AWS_KMS_KEY_ID}"
+  
+  # Local container storage | 本地容器存儲
+  local:
+    models_path: "/app/models"
+    data_path: "/app/data"
+    output_path: "/app/output"
+    logs_path: "/app/logs"
+    tmp_path: "/tmp"
+  
+  # Storage synchronization | 存儲同步
+  sync:
+    enabled: true
+    interval: 300  # 5 minutes
+    auto_upload_outputs: true
+    auto_download_models: true
+    compression: true
+
+# ============================================================================
+# DATABASE CONFIGURATION | 資料庫配置
+# ============================================================================
+database:
+  # Amazon RDS PostgreSQL | Amazon RDS PostgreSQL
+  postgres:
+    host: "${POSTGRES_HOST}"
+    port: 5432
+    database: "${POSTGRES_DB}"
+    username: "${POSTGRES_USER}"
+    password: "${POSTGRES_PASSWORD}"
+    
+    # Connection pool settings | 連接池設置
+    pool_size: 20
+    max_overflow: 30
+    pool_timeout: 30
+    pool_recycle: 3600
+    pool_pre_ping: true
+    echo: false
+    
+    # SSL/TLS settings | SSL/TLS 設置
+    connect_args:
+      sslmode: "require"
+      sslcert: "/app/config/ssl/client-cert.pem"
+      sslkey: "/app/config/ssl/client-key.pem"
+      sslrootcert: "/app/config/ssl/ca-cert.pem"
+      connect_timeout: 10
+      application_name: "AIFX-Cloud-Production"
+    
+    # Performance optimization | 性能優化
+    query_timeout: 30
+    statement_timeout: 60
+    lock_timeout: 30
+
+  # Amazon ElastiCache Redis | Amazon ElastiCache Redis
+  redis:
+    host: "${REDIS_HOST}"
+    port: 6379
+    db: 0
+    password: "${REDIS_PASSWORD}"
+    
+    # Connection settings | 連接設置
+    socket_timeout: 5
+    socket_connect_timeout: 5
+    socket_keepalive: true
+    socket_keepalive_options: {}
+    
+    # Connection pool | 連接池
+    connection_pool_kwargs:
+      max_connections: 50
+      retry_on_timeout: true
+      health_check_interval: 30
+    
+    # Cluster settings | 集群設置
+    cluster_mode: true
+    skip_full_coverage_check: false
+    
+    # Performance settings | 性能設置
+    decode_responses: true
+    encoding: "utf-8"
+    encoding_errors: "strict"
+
+# ============================================================================
+# AI MODELS CONFIGURATION | AI模型配置
+# ============================================================================
+ai_models:
+  # Cloud storage integration | 雲端存儲整合
+  storage_backend: "s3"
+  cache_backend: "local"
+  
+  # Model loading | 模型加載
+  lazy_loading: true
+  preload_models: ["xgboost_model.joblib"]
+  model_cache_size: "2GB"
+  
+  # XGBoost Configuration | XGBoost 配置
+  xgboost:
+    model_file: "xgboost_model.joblib"
+    s3_key: "models/xgboost/xgboost_model.joblib"
+    prediction_threshold: 0.6
+    max_prediction_time: 0.1  # seconds
+    batch_size: 1000
+    
+  # Random Forest Configuration | 隨機森林配置
+  random_forest:
+    model_file: "rf_model.joblib"
+    s3_key: "models/random_forest/rf_model.joblib"
+    prediction_threshold: 0.6
+    max_prediction_time: 0.1  # seconds
+    batch_size: 1000
+    
+  # LSTM Configuration | LSTM 配置
+  lstm:
+    model_file: "lstm_model.h5"
+    s3_key: "models/lstm/lstm_model.h5"
+    prediction_threshold: 0.6
+    max_prediction_time: 0.2  # seconds
+    sequence_length: 60
+    batch_size: 32
+    
+  # Ensemble Configuration | 集成配置
+  ensemble:
+    weights:
+      xgboost: 0.4
+      random_forest: 0.3
+      lstm: 0.3
+    min_agreement: 2  # Minimum models that must agree
+    confidence_threshold: 0.7
+
+# ============================================================================
+# MONITORING & OBSERVABILITY | 監控與可觀測性
+# ============================================================================
+monitoring:
+  # CloudWatch Integration | CloudWatch 整合
+  cloudwatch:
+    enabled: true
+    region: "us-west-2"
+    namespace: "AIFX/Production"
+    log_group: "/aws/eks/aifx-production/aifx-application"
+    
+    # Metrics | 指標
+    custom_metrics:
+      - "trading_signals_generated"
+      - "ai_model_predictions"
+      - "position_changes"
+      - "risk_management_actions"
+      - "execution_latency"
+      - "data_processing_time"
+    
+    # Alarms | 警報
+    alarms:
+      high_cpu_usage: 80
+      high_memory_usage: 85
+      high_error_rate: 5  # percent
+      low_prediction_accuracy: 55  # percent
+  
+  # Prometheus Integration | Prometheus 整合
+  prometheus:
+    enabled: true
+    port: 8001
+    path: "/metrics"
+    scrape_interval: 30
+    
+    # Custom metrics | 自定義指標
+    custom_metrics:
+      - name: "aifx_trading_signals_total"
+        type: "counter"
+        description: "Total number of trading signals generated"
+      - name: "aifx_model_prediction_duration_seconds"
+        type: "histogram"
+        description: "Time spent on AI model predictions"
+      - name: "aifx_active_positions"
+        type: "gauge"
+        description: "Number of active trading positions"
+  
+  # Health Check Configuration | 健康檢查配置
+  health_check:
+    interval: 30                # seconds
+    timeout: 10                 # seconds
+    retries: 3
+    
+    # Components to check | 檢查的組件
+    components:
+      - "database_connection"
+      - "redis_connection"
+      - "s3_connectivity"
+      - "ai_models_loaded"
+      - "trading_engine_status"
+    
+    # Endpoints | 端點
+    endpoints:
+      liveness: "/health"
+      readiness: "/ready"
+      startup: "/startup"
+
+# ============================================================================
+# AUTOSCALING CONFIGURATION | 自動擴展配置
+# ============================================================================
+autoscaling:
+  # Horizontal Pod Autoscaler | 水平Pod自動擴展器
+  hpa:
+    enabled: true
+    min_replicas: 3
+    max_replicas: 10
+    
+    # Metrics for scaling | 擴展指標
+    metrics:
+      - type: "cpu"
+        target_percent: 70
+      - type: "memory"
+        target_percent: 80
+      - type: "custom"
+        name: "trading_volume"
+        target_value: 1000
+    
+    # Scaling behavior | 擴展行為
+    behavior:
+      scale_up:
+        stabilization_window: 60    # seconds
+        policies:
+          - type: "percent"
+            value: 50
+            period: 60
+      scale_down:
+        stabilization_window: 300   # seconds
+        policies:
+          - type: "percent"
+            value: 25
+            period: 60
+  
+  # Vertical Pod Autoscaler | 垂直Pod自動擴展器
+  vpa:
+    enabled: false  # Enable if needed
+    update_mode: "Auto"
+    min_allowed:
+      cpu: "500m"
+      memory: "1Gi"
+    max_allowed:
+      cpu: "4000m"
+      memory: "8Gi"
+
+# ============================================================================
+# SECURITY CONFIGURATION | 安全配置
+# ============================================================================
+security:
+  # Container security | 容器安全
+  container:
+    run_as_non_root: true
+    run_as_user: 1000
+    run_as_group: 1000
+    read_only_root_filesystem: true
+    allow_privilege_escalation: false
+    drop_capabilities: ["ALL"]
+    seccomp_profile: "runtime/default"
+  
+  # Network security | 網絡安全
+  network:
+    policies_enabled: true
+    ingress_allowed: [80, 443, 8000]
+    egress_allowed: [443, 5432, 6379, 53]
+  
+  # Secrets management | 密鑰管理
+  secrets:
+    backend: "aws_secrets_manager"
+    rotation_enabled: true
+    rotation_interval: 2592000  # 30 days
+    
+    # Secret names | 密鑰名稱
+    names:
+      database_credentials: "aifx/production/database"
+      redis_credentials: "aifx/production/redis"
+      api_keys: "aifx/production/api-keys"
+      ssl_certificates: "aifx/production/ssl"
+  
+  # Encryption | 加密
+  encryption:
+    at_rest: true
+    in_transit: true
+    key_management_service: "aws_kms"
+    key_rotation_enabled: true
+
+# ============================================================================
+# DISASTER RECOVERY | 災難恢復
+# ============================================================================
+disaster_recovery:
+  # Backup configuration | 備份配置
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM UTC
+    retention_days: 30
+    cross_region_replication: true
+    secondary_region: "us-east-1"
+    
+    # Backup targets | 備份目標
+    targets:
+      - "database"
+      - "redis_snapshots"
+      - "ai_models"
+      - "configuration"
+      - "logs"
+  
+  # Recovery procedures | 恢復程序
+  recovery:
+    rto_target: 240  # minutes (4 hours)
+    rpo_target: 60   # minutes (1 hour)
+    automated_failover: true
+    health_check_interval: 60  # seconds
+    
+    # Recovery steps | 恢復步驟
+    steps:
+      - "validate_secondary_region"
+      - "restore_database"
+      - "restore_redis"
+      - "deploy_application"
+      - "verify_functionality"
+      - "update_dns"
+
+# ============================================================================
+# PERFORMANCE OPTIMIZATION | 性能優化
+# ============================================================================
+performance:
+  # Resource management | 資源管理
+  resources:
+    requests:
+      cpu: "1000m"
+      memory: "2Gi"
+    limits:
+      cpu: "4000m"
+      memory: "8Gi"
+  
+  # JVM/Python optimization | JVM/Python 優化
+  python:
+    optimization_level: 2
+    garbage_collection: "generational"
+    memory_pool_size: "2GB"
+    thread_pool_size: 20
+  
+  # Caching strategy | 緩存策略
+  caching:
+    levels: ["memory", "redis", "s3"]
+    ttl:
+      market_data: 60      # seconds
+      predictions: 300     # seconds
+      models: 3600        # seconds
+      configuration: 1800  # seconds
+    
+    # Cache warming | 緩存預熱
+    warm_up:
+      enabled: true
+      components: ["models", "configuration"]
+      timeout: 120  # seconds
+
+# ============================================================================
+# COMPLIANCE & AUDITING | 合規與審計
+# ============================================================================
+compliance:
+  # Audit logging | 審計日誌
+  audit:
+    enabled: true
+    level: "detailed"
+    retention_days: 365
+    destinations: ["cloudwatch", "s3"]
+    
+    # Events to audit | 審計事件
+    events:
+      - "trade_executions"
+      - "risk_management_actions"
+      - "model_predictions"
+      - "configuration_changes"
+      - "user_access"
+      - "system_errors"
+  
+  # Data governance | 數據治理
+  data_governance:
+    classification: "confidential"
+    retention_policy: "7_years"
+    access_controls: "role_based"
+    encryption_required: true
+    
+    # Data lineage | 數據血緣
+    lineage_tracking: true
+    metadata_management: true
+    quality_monitoring: true
