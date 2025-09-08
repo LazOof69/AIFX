@@ -1,0 +1,16 @@
+# Railway Configuration for AIFX
+# AIFX Railway 配置
+
+[build]
+builder = "dockerfile"
+dockerfile = "Dockerfile"
+
+[deploy]
+startCommand = "gunicorn --config config/gunicorn.conf.py src.main.python.app:create_app()"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "always"
+
+[env]
+AIFX_ENV = "production"
+PYTHONPATH = "/app"

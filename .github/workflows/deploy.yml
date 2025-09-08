@@ -42,8 +42,6 @@ env:
   KUBE_NAMESPACE: aifx
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
 jobs:
   # ============================================================================
@@ -61,7 +59,7 @@ jobs:
         fetch-depth: 0
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v4
       with:
         python-version: '3.12'
         cache: 'pip'
@@ -84,14 +82,13 @@ jobs:
         mypy src/ --ignore-missing-imports
 
     - name: Run security scan
-      continue-on-error: true
       run: |
         pip install bandit safety
         bandit -r src/ -f json -o bandit-report.json || true
         safety check --json --output safety-report.json || true
 
     - name: Upload security reports
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       if: always()
       with:
         name: security-reports
@@ -137,7 +134,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v4
       with:
         python-version: '3.12'
         cache: 'pip'
@@ -162,7 +159,7 @@ jobs:
         python -m pytest src/test/ -v --cov=src --cov-report=xml --cov-report=html
 
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
         flags: unittests
@@ -178,7 +175,6 @@ jobs:
         REDIS_HOST: localhost
         REDIS_PORT: 6379
         AIFX_ENV: testing
-        SKIP_NETWORK_TESTS: false
       run: |
         python test_integration_phase1_phase2.py
         python test_phase3_signal_combination.py
@@ -193,7 +189,7 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     
     outputs:
-      image-tag: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+      image-tag: ${{ steps.meta.outputs.tags }}
       image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
@@ -203,6 +199,8 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Login to Amazon ECR
@@ -240,21 +238,20 @@ jobs:
     - name: Generate SBOM
       uses: anchore/sbom-action@v0
       with:
-        image: ${{ needs.build-and-push.outputs.image-tag }}
+        image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
         format: spdx-json
         output-file: sbom.spdx.json
 
     - name: Scan image for vulnerabilities
       uses: anchore/scan-action@v3
       id: scan
-      continue-on-error: true
       with:
-        image: ${{ needs.build-and-push.outputs.image-tag }}
-        fail-build: false
+        image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        fail-build: true
         severity-cutoff: high
 
     - name: Upload scan results
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v2
       if: always()
       with:
         sarif_file: ${{ steps.scan.outputs.sarif }}
@@ -276,6 +273,8 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Update kubeconfig
@@ -325,6 +324,8 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Update kubeconfig
@@ -395,6 +396,8 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Update kubeconfig

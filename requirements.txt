@@ -35,6 +35,10 @@ requests>=2.25.0             # HTTP requests | HTTP請求
 tqdm>=4.60.0                 # Progress bars | 進度條
 joblib>=1.1.0                # Model serialization | 模型序列化
 
+# Database Support | 資料庫支援
+sqlalchemy>=2.0.0            # SQL toolkit and ORM | SQL工具包和ORM
+pyodbc>=4.0.39               # SQL Server driver | SQL Server驅動程式
+
 # Time & Date Handling | 時間與日期處理  
 pytz>=2021.1                 # Timezone handling | 時區處理
 python-dateutil>=2.8.0       # Date utilities | 日期工具
