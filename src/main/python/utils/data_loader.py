@@ -217,7 +217,7 @@ class DataLoader:
         for symbol, df in data_dict.items():
             try:
                 processed_file = self.processed_data_path / f"{symbol}_processed.csv"
-                df.to_csv(processed_file)
+                df.to_csv(processed_file, date_format='%Y-%m-%d %H:%M:%S')
                 
                 self.logger.log_data_event(
                     operation="saved_processed",

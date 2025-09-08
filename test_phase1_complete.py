@@ -126,7 +126,7 @@ class Phase1Tester:
             'pandas',
             'numpy',
             'yfinance',
-            'scikit-learn',
+            'sklearn',
             'matplotlib'
         ]
         

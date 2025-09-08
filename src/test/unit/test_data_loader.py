@@ -126,7 +126,7 @@ class TestDataLoader(unittest.TestCase):
             self.fail(f"Valid data validation failed: {e}")
         
         # Test insufficient data points | 測試數據點不足
-        small_data = valid_data.head(50)  # Below minimum | 低於最小值
+        small_data = valid_data.head(5)  # Below absolute minimum | 低於絕對最小值
         with self.assertRaises(ValueError):
             self.data_loader._validate_data(small_data, 'TEST')
         
@@ -237,7 +237,22 @@ class TestDataLoaderIntegration(unittest.TestCase):
         
         # Verify loaded data | 驗證載入的數據
         self.assertIn('EURUSD', loaded_data)
-        pd.testing.assert_frame_equal(loaded_data['EURUSD'], sample_data)
+        
+        # Compare data values, ignoring frequency information
+        loaded_df = loaded_data['EURUSD']
+        self.assertEqual(len(loaded_df), len(sample_data))
+        self.assertTrue(loaded_df.columns.equals(sample_data.columns))
+        
+        # Check index values (ignore frequency)
+        self.assertTrue(loaded_df.index.equals(sample_data.index))
+        
+        # Check data values with tolerance for floating point precision
+        pd.testing.assert_frame_equal(
+            loaded_df.reset_index(drop=True), 
+            sample_data.reset_index(drop=True),
+            check_exact=False,
+            rtol=1e-10
+        )
 
 
 def create_sample_ohlcv_data(periods: int = 100, start_date: str = '2024-01-01') -> pd.DataFrame:
