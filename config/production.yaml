@@ -1,0 +1,321 @@
+# AIFX Production Configuration | AIFX 生產配置
+# AI-Enhanced Forex Trading System Production Settings
+# AI增強外匯交易系統生產設置
+
+# ============================================================================
+# APPLICATION CONFIGURATION | 應用程式配置
+# ============================================================================
+app:
+  name: "AIFX Trading System"
+  version: "4.0.0"
+  environment: "production"
+  debug: false
+  timezone: "UTC"
+  
+  # Performance settings | 性能設置
+  max_workers: 8
+  worker_connections: 2000
+  request_timeout: 30
+  keep_alive: 2
+  
+  # Security settings | 安全設置
+  secret_key: "${AIFX_SECRET_KEY}"
+  cors_origins: []
+  allowed_hosts: 
+    - "aifx.trading.local"
+    - "localhost"
+
+# ============================================================================
+# TRADING CONFIGURATION | 交易配置
+# ============================================================================
+trading:
+  # Supported currency pairs | 支援的貨幣對
+  currency_pairs:
+    - "EURUSD=X"
+    - "USDJPY=X"
+  
+  # Trading timeframes | 交易時間框架
+  timeframes:
+    primary: "1h"
+    secondary: ["4h", "1d"]
+  
+  # Data settings | 數據設置
+  data_retention_days: 365
+  backup_frequency: "daily"
+  
+  # Performance thresholds | 性能閾值
+  max_concurrent_trades: 10
+  position_size_limit: 0.02  # 2% of account
+  daily_loss_limit: 0.05     # 5% daily loss limit
+
+# ============================================================================
+# DATABASE CONFIGURATION | 資料庫配置
+# ============================================================================
+database:
+  # PostgreSQL Primary Database | PostgreSQL 主資料庫
+  postgres:
+    host: "${POSTGRES_HOST:-postgres}"
+    port: 5432
+    database: "${POSTGRES_DB:-aifx_production}"
+    username: "${POSTGRES_USER:-aifx_user}"
+    password: "${POSTGRES_PASSWORD}"
+    pool_size: 20
+    max_overflow: 30
+    pool_timeout: 30
+    pool_recycle: 3600
+    echo: false
+    
+    # Connection parameters | 連接參數
+    connect_args:
+      sslmode: "require"
+      connect_timeout: 10
+      application_name: "AIFX-Trading-System"
+
+  # Redis Cache Configuration | Redis 緩存配置
+  redis:
+    host: "${REDIS_HOST:-redis}"
+    port: 6379
+    db: 0
+    password: "${REDIS_PASSWORD}"
+    socket_timeout: 5
+    socket_connect_timeout: 5
+    socket_keepalive: true
+    socket_keepalive_options: {}
+    connection_pool_kwargs:
+      max_connections: 50
+      retry_on_timeout: true
+
+# ============================================================================
+# AI MODELS CONFIGURATION | AI模型配置
+# ============================================================================
+ai_models:
+  # Model paths | 模型路徑
+  model_directory: "/app/models/trained"
+  
+  # XGBoost Configuration | XGBoost 配置
+  xgboost:
+    model_file: "xgboost_model.joblib"
+    prediction_threshold: 0.6
+    max_prediction_time: 0.1  # seconds
+  
+  # Random Forest Configuration | 隨機森林配置
+  random_forest:
+    model_file: "rf_model.joblib"
+    prediction_threshold: 0.6
+    max_prediction_time: 0.1  # seconds
+    
+  # LSTM Configuration | LSTM 配置
+  lstm:
+    model_file: "lstm_model.h5"
+    prediction_threshold: 0.6
+    max_prediction_time: 0.2  # seconds
+    sequence_length: 60
+    
+  # Ensemble Configuration | 集成配置
+  ensemble:
+    weights:
+      xgboost: 0.4
+      random_forest: 0.3
+      lstm: 0.3
+    min_agreement: 2  # Minimum models that must agree
+
+# ============================================================================
+# RISK MANAGEMENT CONFIGURATION | 風險管理配置
+# ============================================================================
+risk_management:
+  # Position Sizing | 倉位大小
+  position_sizing:
+    method: "fixed_percentage"  # fixed_percentage, kelly, atr_based, volatility_adjusted
+    fixed_percentage: 0.02      # 2% risk per trade
+    max_position_size: 0.05     # 5% maximum position
+    min_position_size: 0.005    # 0.5% minimum position
+    
+  # Stop Loss Configuration | 止損配置
+  stop_loss:
+    method: "atr_based"         # atr_based, fixed_percentage, volatility_based
+    atr_multiplier: 2.0
+    max_stop_loss: 0.03         # 3% maximum stop loss
+    min_stop_loss: 0.005        # 0.5% minimum stop loss
+    
+  # Take Profit Configuration | 止盈配置
+  take_profit:
+    method: "atr_based"         # atr_based, fixed_ratio, dynamic
+    atr_multiplier: 3.0
+    risk_reward_ratio: 2.0      # 1:2 risk-reward ratio
+    
+  # Portfolio Limits | 組合限制
+  portfolio:
+    max_drawdown: 0.15          # 15% maximum drawdown
+    max_concurrent_positions: 5
+    correlation_limit: 0.7      # Maximum correlation between positions
+
+# ============================================================================
+# MONITORING & ALERTING | 監控與警報
+# ============================================================================
+monitoring:
+  # Health Check Configuration | 健康檢查配置
+  health_check:
+    interval: 30                # seconds
+    timeout: 10                 # seconds
+    retries: 3
+    
+  # Performance Monitoring | 性能監控
+  performance:
+    track_latency: true
+    track_memory: true
+    track_cpu: true
+    alert_thresholds:
+      latency_ms: 100
+      memory_percent: 80
+      cpu_percent: 80
+      
+  # Trading Alerts | 交易警報
+  alerts:
+    email_notifications: true
+    webhook_url: "${ALERT_WEBHOOK_URL}"
+    alert_levels:
+      - "critical"
+      - "warning"
+      - "info"
+
+# ============================================================================
+# LOGGING CONFIGURATION | 日誌配置
+# ============================================================================
+logging:
+  version: 1
+  disable_existing_loggers: false
+  
+  formatters:
+    standard:
+      format: "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)d] %(message)s"
+      datefmt: "%Y-%m-%d %H:%M:%S"
+    structured:
+      format: "%(asctime)s %(levelname)s %(name)s %(message)s"
+      datefmt: "%Y-%m-%d %H:%M:%S"
+      
+  handlers:
+    console:
+      class: "logging.StreamHandler"
+      level: "INFO"
+      formatter: "standard"
+      stream: "ext://sys.stdout"
+      
+    file:
+      class: "logging.handlers.RotatingFileHandler"
+      level: "INFO"
+      formatter: "structured"
+      filename: "/app/logs/aifx.log"
+      maxBytes: 104857600  # 100MB
+      backupCount: 10
+      
+    error_file:
+      class: "logging.handlers.RotatingFileHandler"
+      level: "ERROR"
+      formatter: "structured"
+      filename: "/app/logs/aifx_error.log"
+      maxBytes: 104857600  # 100MB
+      backupCount: 5
+      
+  loggers:
+    "":
+      level: "INFO"
+      handlers: ["console", "file", "error_file"]
+      propagate: false
+      
+    "aifx.trading":
+      level: "DEBUG"
+      handlers: ["file"]
+      propagate: false
+      
+    "aifx.risk":
+      level: "DEBUG"
+      handlers: ["file"]
+      propagate: false
+
+# ============================================================================
+# EXTERNAL SERVICES | 外部服務
+# ============================================================================
+external_services:
+  # Data Providers | 數據提供商
+  yahoo_finance:
+    timeout: 30
+    retries: 3
+    backoff_factor: 0.3
+    
+  # Broker Integration | 券商整合
+  broker:
+    name: "demo"  # Replace with actual broker
+    api_url: "${BROKER_API_URL}"
+    api_key: "${BROKER_API_KEY}"
+    timeout: 10
+    max_orders_per_minute: 60
+    
+# ============================================================================
+# FEATURE FLAGS | 功能標誌
+# ============================================================================
+features:
+  enable_live_trading: false      # Set to true for live trading
+  enable_paper_trading: true      # Paper trading mode
+  enable_backtesting: true        # Backtesting capabilities
+  enable_model_training: false    # Model retraining in production
+  enable_advanced_analytics: true # Advanced performance analytics
+  enable_api_endpoints: true      # REST API endpoints
+  enable_websocket: true          # WebSocket connections
+  
+# ============================================================================
+# RESOURCE LIMITS | 資源限制
+# ============================================================================
+resources:
+  # Memory limits | 內存限制
+  max_memory_mb: 4096
+  memory_warning_threshold: 3200  # 80% of max
+  
+  # CPU limits | CPU限制
+  max_cpu_percent: 200            # 2 cores
+  cpu_warning_threshold: 160      # 80% of max
+  
+  # Disk limits | 磁碟限制
+  max_disk_usage_gb: 50
+  disk_warning_threshold: 40      # 80% of max
+  
+  # Network limits | 網絡限制
+  max_connections: 1000
+  connection_timeout: 30
+  
+# ============================================================================
+# BACKUP CONFIGURATION | 備份配置
+# ============================================================================
+backup:
+  enabled: true
+  schedule: "0 2 * * *"           # Daily at 2 AM UTC
+  retention_days: 30
+  compression: true
+  encryption: true
+  
+  # Backup targets | 備份目標
+  targets:
+    - type: "s3"
+      bucket: "${AWS_S3_BUCKET}"
+      prefix: "aifx-backups/"
+    - type: "local"
+      path: "/app/backups"
+      
+# ============================================================================
+# SECURITY CONFIGURATION | 安全配置
+# ============================================================================
+security:
+  # Encryption | 加密
+  encryption_key: "${ENCRYPTION_KEY}"
+  
+  # Rate limiting | 速率限制
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 60
+    burst_limit: 100
+    
+  # Authentication | 身份驗證
+  auth:
+    token_expiry: 3600            # 1 hour
+    refresh_token_expiry: 86400   # 24 hours
+    max_login_attempts: 5
+    lockout_duration: 900         # 15 minutes
