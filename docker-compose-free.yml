@@ -9,21 +9,38 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    env_file:
-      - .env.docker
     ports:
       - "8000:8000"
     environment:
+      - PYTHONPATH=/home/aifx/app/src/main/python
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
       - AIFX_ENV=production
+      - AIFX_ROOT=/home/aifx/app
+      - AIFX_DATA_DIR=/home/aifx/app/data
+      - AIFX_MODELS_DIR=/home/aifx/app/models
+      - AIFX_OUTPUT_DIR=/home/aifx/app/output
+      - AIFX_LOGS_DIR=/home/aifx/app/logs
+      - TF_CPP_MIN_LOG_LEVEL=2
+      - SKIP_NETWORK_TESTS=true
       - DATABASE_URL=postgresql://aifx:password@db:5432/aifx
       - REDIS_URL=redis://redis:6379/0
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=aifx
+      - POSTGRES_USER=aifx
+      - POSTGRES_PASSWORD=password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PORT=8000
+      - HOST=0.0.0.0
     depends_on:
       - db
       - redis
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./models:/app/models
+      - ./data:/home/aifx/app/data
+      - ./logs:/home/aifx/app/logs
+      - ./models:/home/aifx/app/models
+      - ./output:/home/aifx/app/output
     restart: unless-stopped
 
   db:
@@ -34,7 +51,7 @@ services:
       POSTGRES_PASSWORD: password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./config/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     restart: unless-stopped

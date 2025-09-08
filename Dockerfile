@@ -107,7 +107,7 @@ EXPOSE 8000
 
 # Production entrypoint | 生產入口點
 ENTRYPOINT ["./entrypoint.sh"]
-CMD ["gunicorn", "--config", "config/gunicorn.conf.py", "src.main.python.app:create_app()"]
+CMD ["python", "-m", "src.main.python.app"]
 
 # ============================================================================
 # Stage 5: Testing Environment | 第五階段：測試環境
