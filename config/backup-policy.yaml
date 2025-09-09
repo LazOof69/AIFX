@@ -1,0 +1,389 @@
+# AIFX Database Backup Policy Configuration | AIFX 資料庫備份策略配置
+# Phase 4.1.4 Database Optimization - Backup & Recovery
+# 第四階段 4.1.4 資料庫優化 - 備份與恢復
+
+# ============================================================================
+# BACKUP SCHEDULE CONFIGURATION | 備份調度配置
+# ============================================================================
+schedule:
+  # Full backups | 完整備份
+  full_backup:
+    frequency: "daily"
+    time: "02:00"
+    timezone: "UTC"
+    enabled: true
+    
+  # Incremental backups | 增量備份
+  incremental_backup:
+    frequency: "hourly"
+    interval: 4  # Every 4 hours
+    enabled: true
+    
+  # Transaction log backups | 交易日誌備份
+  transaction_log_backup:
+    frequency: "every_15_minutes"
+    enabled: true
+    
+  # Point-in-time recovery preparation | 時間點恢復準備
+  pit_recovery:
+    wal_archiving: true
+    archive_retention_days: 7
+
+# ============================================================================
+# BACKUP RETENTION POLICIES | 備份保留策略
+# ============================================================================
+retention:
+  # Local storage retention | 本地存儲保留
+  local:
+    daily_backups: 7     # Keep 7 days of daily backups
+    weekly_backups: 4    # Keep 4 weeks of weekly backups
+    monthly_backups: 12  # Keep 12 months of monthly backups
+    
+  # Cloud storage retention | 雲端存儲保留
+  cloud:
+    daily_backups: 30    # Keep 30 days in cloud
+    weekly_backups: 12   # Keep 12 weeks in cloud
+    monthly_backups: 24  # Keep 24 months in cloud
+    yearly_backups: 7    # Keep 7 years for compliance
+    
+  # Archive storage | 歸檔存儲
+  archive:
+    enabled: true
+    storage_class: "GLACIER"
+    transition_days: 90  # Move to Glacier after 90 days
+    deep_archive_days: 365  # Move to Deep Archive after 1 year
+
+# ============================================================================
+# BACKUP TARGETS CONFIGURATION | 備份目標配置
+# ============================================================================
+targets:
+  # PostgreSQL Configuration | PostgreSQL 配置
+  postgresql:
+    enabled: true
+    priority: "high"
+    backup_method: "pg_dump"
+    format: "custom"
+    compression_level: 6
+    include_schemas: ["public", "trading", "analytics"]
+    exclude_tables: ["temp_*", "cache_*"]
+    
+    # Connection settings | 連接設置
+    connection:
+      host: "${POSTGRES_HOST}"
+      port: 5432
+      database: "${POSTGRES_DB}"
+      username: "${POSTGRES_USER}"
+      password: "${POSTGRES_PASSWORD}"
+      ssl_mode: "require"
+      
+    # Parallel processing | 並行處理
+    parallel_jobs: 4
+    max_rate_mb_per_sec: 100
+    
+    # Verification | 驗證
+    verify_backup: true
+    checksum_verification: true
+    
+  # Redis Configuration | Redis 配置
+  redis:
+    enabled: true
+    priority: "medium"
+    backup_method: "rdb_snapshot"
+    
+    # Connection settings | 連接設置
+    connection:
+      host: "${REDIS_HOST}"
+      port: 6379
+      password: "${REDIS_PASSWORD}"
+      
+    # Backup settings | 備份設置
+    save_config: "900 1 300 10 60 10000"  # Redis SAVE configuration
+    rdb_compression: true
+    rdb_checksum: true
+    
+  # MongoDB Configuration | MongoDB 配置
+  mongodb:
+    enabled: false  # Enable if MongoDB is used
+    priority: "medium"
+    backup_method: "mongodump"
+    
+    # Connection settings | 連接設置
+    connection:
+      uri: "${MONGODB_URI}"
+      
+    # Backup settings | 備份設置
+    gzip_compression: true
+    oplog_replay: true
+
+# ============================================================================
+# STORAGE DESTINATIONS | 存儲目的地
+# ============================================================================
+destinations:
+  # Local storage | 本地存儲
+  local:
+    enabled: true
+    path: "/app/backups"
+    max_size_gb: 100
+    cleanup_enabled: true
+    
+  # AWS S3 Storage | AWS S3 存儲
+  s3:
+    enabled: true
+    bucket: "${S3_BACKUP_BUCKET}"
+    prefix: "database-backups"
+    region: "${AWS_REGION}"
+    storage_class: "STANDARD_IA"
+    
+    # Encryption | 加密
+    encryption:
+      type: "AES256"
+      kms_key_id: "${AWS_KMS_KEY_ID}"
+      
+    # Lifecycle policy | 生命週期策略
+    lifecycle:
+      transition_to_ia_days: 30
+      transition_to_glacier_days: 90
+      transition_to_deep_archive_days: 365
+      expiration_days: 2555  # 7 years
+      
+    # Transfer settings | 傳輸設置
+    multipart_threshold_mb: 64
+    multipart_chunksize_mb: 16
+    max_concurrency: 10
+    max_bandwidth_mb_per_sec: 100
+    
+  # Secondary region backup | 次要區域備份
+  s3_secondary:
+    enabled: true
+    bucket: "${S3_BACKUP_BUCKET_SECONDARY}"
+    prefix: "database-backups"
+    region: "us-east-1"  # Different region for disaster recovery
+    storage_class: "STANDARD_IA"
+    
+    # Cross-region replication | 跨區域複製
+    replication_enabled: true
+    replication_delay_hours: 6
+
+# ============================================================================
+# BACKUP ENCRYPTION | 備份加密
+# ============================================================================
+encryption:
+  # Encryption at rest | 靜態加密
+  at_rest:
+    enabled: true
+    algorithm: "AES-256-CBC"
+    key_source: "aws_kms"
+    key_id: "${BACKUP_ENCRYPTION_KEY_ID}"
+    
+  # Encryption in transit | 傳輸加密
+  in_transit:
+    enabled: true
+    tls_version: "1.2"
+    verify_ssl: true
+    
+  # Key management | 密鑰管理
+  key_management:
+    rotation_enabled: true
+    rotation_interval_days: 90
+    key_backup_enabled: true
+
+# ============================================================================
+# MONITORING & ALERTING | 監控與警報
+# ============================================================================
+monitoring:
+  # Health checks | 健康檢查
+  health_checks:
+    enabled: true
+    interval_minutes: 15
+    timeout_seconds: 30
+    
+    # Check targets | 檢查目標
+    checks:
+      - "backup_job_status"
+      - "storage_space"
+      - "backup_integrity"
+      - "restore_capability"
+      
+  # Metrics collection | 指標收集
+  metrics:
+    enabled: true
+    export_to_prometheus: true
+    export_to_cloudwatch: true
+    
+    # Custom metrics | 自定義指標
+    custom_metrics:
+      - name: "backup_duration_seconds"
+        type: "histogram"
+        description: "Time taken to complete backup"
+      - name: "backup_size_bytes"
+        type: "gauge"
+        description: "Size of backup files"
+      - name: "backup_success_total"
+        type: "counter"
+        description: "Total successful backups"
+      - name: "backup_failure_total"
+        type: "counter"
+        description: "Total failed backups"
+        
+  # Alerting configuration | 警報配置
+  alerts:
+    enabled: true
+    
+    # Alert channels | 警報通道
+    channels:
+      email:
+        enabled: true
+        recipients: ["${BACKUP_ALERT_EMAIL}"]
+        smtp_server: "${SMTP_SERVER}"
+        
+      slack:
+        enabled: true
+        webhook_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#aifx-alerts"
+        
+      pagerduty:
+        enabled: false
+        integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+        
+    # Alert conditions | 警報條件
+    conditions:
+      backup_failure:
+        severity: "critical"
+        message: "Database backup failed"
+        
+      backup_delay:
+        severity: "warning"
+        threshold_minutes: 30
+        message: "Backup is delayed beyond expected time"
+        
+      storage_space_low:
+        severity: "warning"
+        threshold_percent: 90
+        message: "Backup storage space is running low"
+        
+      backup_corruption:
+        severity: "critical"
+        message: "Backup integrity check failed"
+
+# ============================================================================
+# DISASTER RECOVERY | 災難恢復
+# ============================================================================
+disaster_recovery:
+  # Recovery objectives | 恢復目標
+  objectives:
+    rto_minutes: 240  # Recovery Time Objective: 4 hours
+    rpo_minutes: 60   # Recovery Point Objective: 1 hour
+    
+  # Recovery procedures | 恢復程序
+  procedures:
+    automated_failover: true
+    cross_region_recovery: true
+    
+    # Recovery testing | 恢復測試
+    test_schedule:
+      frequency: "monthly"
+      full_restore_test: "quarterly"
+      
+  # Recovery validation | 恢復驗證
+  validation:
+    data_consistency_checks: true
+    performance_benchmarks: true
+    application_connectivity_tests: true
+
+# ============================================================================
+# COMPLIANCE & AUDITING | 合規與審計
+# ============================================================================
+compliance:
+  # Regulatory requirements | 監管要求
+  regulations:
+    gdpr_compliant: true
+    sox_compliant: true
+    pci_dss_compliant: false  # Set to true if handling credit card data
+    
+  # Data classification | 數據分類
+  data_classification:
+    trading_data: "confidential"
+    user_data: "sensitive"
+    system_logs: "internal"
+    
+  # Audit logging | 審計日誌
+  audit:
+    enabled: true
+    log_level: "detailed"
+    retention_years: 7
+    
+    # Audit events | 審計事件
+    events:
+      - "backup_started"
+      - "backup_completed"
+      - "backup_failed"
+      - "restore_started"
+      - "restore_completed"
+      - "configuration_changed"
+      - "access_granted"
+      - "access_denied"
+
+# ============================================================================
+# PERFORMANCE OPTIMIZATION | 性能優化
+# ============================================================================
+performance:
+  # Resource allocation | 資源分配
+  resources:
+    max_cpu_cores: 4
+    max_memory_gb: 8
+    max_disk_io_mb_per_sec: 500
+    max_network_mb_per_sec: 100
+    
+  # Optimization settings | 優化設置
+  optimization:
+    parallel_processing: true
+    compression_level: 6  # Balance between speed and size
+    deduplication: true
+    incremental_backups: true
+    
+    # Network optimization | 網絡優化
+    tcp_window_scaling: true
+    tcp_congestion_control: "bbr"
+    connection_pooling: true
+    
+  # Scheduling optimization | 調度優化
+  scheduling:
+    avoid_peak_hours: true
+    peak_hours_start: "08:00"
+    peak_hours_end: "18:00"
+    max_concurrent_jobs: 2
+    job_timeout_hours: 6
+
+# ============================================================================
+# TESTING & VALIDATION | 測試與驗證
+# ============================================================================
+testing:
+  # Backup validation | 備份驗證
+  validation:
+    enabled: true
+    methods:
+      - "checksum_verification"
+      - "header_validation"
+      - "sample_restore_test"
+      - "data_consistency_check"
+      
+  # Restore testing | 恢復測試
+  restore_testing:
+    enabled: true
+    frequency: "weekly"
+    test_environment: "staging"
+    
+    # Test scenarios | 測試場景
+    scenarios:
+      - "full_database_restore"
+      - "point_in_time_recovery"
+      - "partial_table_restore"
+      - "cross_region_restore"
+      
+  # Performance testing | 性能測試
+  performance_testing:
+    enabled: true
+    benchmarks:
+      max_backup_duration_hours: 2
+      max_restore_duration_hours: 4
+      min_throughput_mb_per_sec: 50
