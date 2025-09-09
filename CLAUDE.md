@@ -1,7 +1,7 @@
 # CLAUDE.md - AIFX | CLAUDE 規範文件 - AIFX
 
 > **Documentation Version | 文件版本**: 1.0  
-> **Last Updated | 最後更新**: 2025-01-14  
+> **Last Updated | 最後更新**: 2025-01-14 (User Credential Rule Added)  
 > **Project | 專案名稱**: AIFX  
 > **Description | 專案描述**: Professional quantitative trading researcher. Medium-term forex quantitative trading strategy enhanced with AI models for EUR/USD and USD/JPY on 1-hour timeframe. | 專業量化交易研究員。針對歐元/美元和美元/日圓貨幣對，使用1小時時間框架的中期外匯量化交易策略，結合AI模型增強。  
 > **Features | 功能特色**: GitHub auto-backup, Task agents, technical debt prevention | GitHub 自動備份、任務代理、技術債務預防
@@ -31,6 +31,7 @@ This file provides essential guidance to Claude Code (claude.ai/code) when worki
 - **NEVER** copy-paste code blocks → extract into shared utilities/functions | **絕不** 複製貼上代碼區塊 → 提取到共享工具/函數中
 - **NEVER** hardcode values that should be configurable → use config files/environment variables | **絕不** 硬編碼應可配置的值 → 使用配置文件/環境變數
 - **NEVER** use naming like enhanced_, improved_, new_, v2_ → extend original files instead | **絕不** 使用 enhanced_、improved_、new_、v2_ 等命名 → 改為擴展原始文件
+- **NEVER** proceed with compilation/installation that requires user credentials or manual installation → ALWAYS pause and request user action first | **絕不** 繼續需要用戶憑證或手動安裝的編譯/安裝過程 → **始終** 先暫停並要求用戶採取行動
 - **ALWAYS** provide descriptions in both English and Traditional Chinese | **始終** 提供英文和繁體中文雙語描述
 
 ### 📝 MANDATORY REQUIREMENTS | 強制要求
@@ -43,6 +44,7 @@ This file provides essential guidance to Claude Code (claude.ai/code) when worki
 - **DEBT PREVENTION** - Before creating new files, check for existing similar functionality to extend | **債務預防** - 創建新文件前，檢查現有相似功能以進行擴展
 - **SINGLE SOURCE OF TRUTH** - One authoritative implementation per feature/concept | **單一真實來源** - 每個功能/概念只有一個權威實現
 - **BILINGUAL DESCRIPTIONS** - All descriptions, comments, and documentation must include both English and Traditional Chinese | **雙語描述** - 所有描述、註釋和文件必須包含英文和繁體中文
+- **USER CREDENTIAL REQUEST** - If any operation requires passwords, API keys, or manual installation, STOP and clearly request user action with specific instructions | **用戶憑證請求** - 如果任何操作需要密碼、API密鑰或手動安裝，必須停止並明確向用戶請求行動並提供具體指示
 
 ### ⚡ EXECUTION PATTERNS | 執行模式
 - **PARALLEL TASK AGENTS** - Launch multiple Task agents simultaneously for maximum efficiency | **並行任務代理** - 同時啟動多個任務代理以實現最大效率
@@ -61,6 +63,7 @@ This file provides essential guidance to Claude Code (claude.ai/code) when worki
 - [ ] Will this take >30 seconds? → If YES, use Task agents not Bash
 - [ ] Is this 3+ steps? → If YES, use TodoWrite breakdown first
 - [ ] Am I about to use grep/find/cat? → If YES, use proper tools instead
+- [ ] Does this require user credentials, passwords, or manual installation? → If YES, STOP and request user action first
 
 **Step 3: Technical Debt Prevention (MANDATORY SEARCH FIRST)**
 - [ ] **SEARCH FIRST**: Use Grep pattern="<functionality>.*<keyword>" to find existing implementations
