@@ -1,0 +1,325 @@
+# AIFX Forex Data Sources Configuration | AIFX 外匯數據源配置
+# Phase 4.2 Real-time Data Pipeline - Data Sources
+# 第四階段 4.2 實時數據管道 - 數據源配置
+
+# ============================================================================
+# FOREX DATA SOURCES | 外匯數據源
+# ============================================================================
+forex_data_sources:
+  # Yahoo Finance - Primary free source | Yahoo Finance - 主要免費數據源
+  yahoo:
+    enabled: true
+    priority: 1
+    type: "free"
+    description: "Yahoo Finance real-time forex data"
+    
+    # Connection settings | 連接設置
+    rest_api:
+      base_url: "https://query1.finance.yahoo.com/v8/finance/chart"
+      timeout: 30
+      rate_limit: 2000  # requests per hour
+      
+    websocket:
+      url: "wss://streamer.finance.yahoo.com/"
+      reconnect_interval: 5
+      heartbeat_interval: 30
+      max_reconnect_attempts: 10
+      
+    # Supported forex pairs | 支持的外匯對
+    symbols:
+      EURUSD: "EURUSD=X"
+      USDJPY: "USDJPY=X" 
+      GBPUSD: "GBPUSD=X"
+      USDCHF: "USDCHF=X"
+      AUDUSD: "AUDUSD=X"
+      USDCAD: "USDCAD=X"
+      NZDUSD: "NZDUSD=X"
+      EURJPY: "EURJPY=X"
+      GBPJPY: "GBPJPY=X"
+      EURGBP: "EURGBP=X"
+    
+    # Data quality | 數據品質
+    expected_latency_ms: 1000  # 1 second
+    data_reliability: 85      # 85% reliability score
+    
+    # Rate limiting | 速率限制
+    requests_per_second: 1
+    concurrent_connections: 5
+    
+  # OANDA - Professional forex data (requires account) | OANDA - 專業外匯數據（需要帳戶）
+  oanda:
+    enabled: false  # Initially disabled until account setup
+    priority: 2
+    type: "professional"
+    description: "OANDA professional forex data with low latency"
+    
+    # Authentication | 身份驗證
+    api_key: "${OANDA_API_KEY}"
+    account_id: "${OANDA_ACCOUNT_ID}"
+    
+    # Connection settings | 連接設置
+    rest_api:
+      base_url: "https://api-fxtrade.oanda.com/v3"
+      practice_url: "https://api-fxpractice.oanda.com/v3"
+      timeout: 10
+      
+    streaming:
+      base_url: "https://stream-fxtrade.oanda.com/v3"
+      practice_url: "https://stream-fxpractice.oanda.com/v3"
+      
+    # Supported instruments | 支持的交易工具
+    instruments:
+      - "EUR_USD"
+      - "USD_JPY"
+      - "GBP_USD"  
+      - "USD_CHF"
+      - "AUD_USD"
+      - "USD_CAD"
+      - "NZD_USD"
+      - "EUR_JPY"
+      - "GBP_JPY"
+      - "EUR_GBP"
+      
+    # Data quality | 數據品質
+    expected_latency_ms: 50   # 50ms
+    data_reliability: 99      # 99% reliability score
+    
+    # Configuration | 配置
+    use_practice_account: true  # Start with practice account
+    
+  # FXCM - Alternative professional source | FXCM - 替代專業數據源
+  fxcm:
+    enabled: false  # Initially disabled
+    priority: 3
+    type: "professional" 
+    description: "FXCM real-time forex market data"
+    
+    # Authentication | 身份驗證
+    username: "${FXCM_USERNAME}"
+    password: "${FXCM_PASSWORD}"
+    environment: "demo"  # demo or real
+    
+    # Connection settings | 連接設置
+    server: "http://www.fxcorporate.com/Hosts.jsp"
+    
+    # Supported pairs | 支持的貨幣對
+    symbols:
+      - "EUR/USD"
+      - "USD/JPY"
+      - "GBP/USD"
+      - "USD/CHF"
+      - "AUD/USD"
+      - "USD/CAD"
+      
+    # Data quality | 數據品質  
+    expected_latency_ms: 100  # 100ms
+    data_reliability: 95      # 95% reliability score
+
+# ============================================================================
+# DATA INGESTION CONFIGURATION | 數據攝取配置
+# ============================================================================
+data_ingestion:
+  # Primary trading pairs | 主要交易對
+  primary_pairs:
+    - "EURUSD"
+    - "USDJPY"
+    
+  # Secondary pairs for monitoring | 監控用次要貨幣對
+  secondary_pairs:
+    - "GBPUSD"
+    - "USDCHF"
+    - "AUDUSD"
+    
+  # Data intervals | 數據間隔
+  intervals:
+    tick: true        # Tick-by-tick data if available
+    minute: true      # 1-minute bars
+    hourly: true      # 1-hour bars (primary for trading)
+    daily: false      # Daily bars (not needed for real-time)
+    
+  # Buffer settings | 緩衝設置
+  buffer_size: 1000            # Number of records to buffer
+  flush_interval: 5            # Flush buffer every 5 seconds
+  max_memory_usage_mb: 500     # Maximum memory usage for buffers
+
+# ============================================================================
+# FALLBACK & REDUNDANCY | 備援與冗餘
+# ============================================================================
+failover:
+  # Automatic failover settings | 自動故障轉移設置
+  enable_auto_failover: true
+  failover_timeout: 30         # Seconds before switching to backup
+  
+  # Source priority order | 數據源優先順序
+  priority_order:
+    - "oanda"    # First choice if available
+    - "yahoo"    # Fallback to free source
+    - "fxcm"     # Alternative professional source
+    
+  # Health check | 健康檢查
+  health_check_interval: 60    # Check every minute
+  consecutive_failures_limit: 3 # Switch after 3 consecutive failures
+  
+  # Data validation | 數據驗證
+  cross_validation: true       # Compare data across sources
+  max_price_deviation: 0.001   # Maximum allowed price difference (10 pips)
+  
+# ============================================================================
+# CACHING & STORAGE | 緩存與存儲
+# ============================================================================
+caching:
+  # Redis configuration | Redis配置
+  redis:
+    host: "${REDIS_HOST:-localhost}"
+    port: 6379
+    db: 1  # Use database 1 for real-time data
+    password: "${REDIS_PASSWORD}"
+    
+    # Cache settings | 緩存設置
+    key_prefix: "forex:realtime"
+    default_ttl: 300            # 5 minutes default TTL
+    max_connections: 20
+    
+    # Data structure settings | 數據結構設置
+    use_streams: true           # Use Redis Streams for real-time data
+    stream_maxlen: 10000       # Keep last 10,000 records per stream
+    
+  # Local memory cache | 本地內存緩存
+  memory:
+    enabled: true
+    max_size_mb: 100           # 100MB local cache
+    ttl_seconds: 60            # 1 minute TTL for memory cache
+    
+# ============================================================================
+# DATA QUALITY MONITORING | 數據品質監控
+# ============================================================================
+data_quality:
+  # Monitoring settings | 監控設置
+  enable_monitoring: true
+  check_interval: 30          # Check every 30 seconds
+  
+  # Quality thresholds | 品質閾值
+  max_latency_ms: 5000       # Maximum acceptable latency
+  min_data_freshness: 10      # Data must be fresher than 10 seconds
+  max_missing_ticks: 5        # Maximum consecutive missing ticks
+  
+  # Anomaly detection | 異常檢測
+  price_change_threshold: 0.02  # 2% price change triggers alert
+  volume_anomaly_factor: 3      # Volume 3x normal triggers alert
+  
+  # Alerts | 警報
+  enable_alerts: true
+  alert_channels:
+    - "slack"
+    - "email"
+    - "database"
+    
+# ============================================================================
+# PERFORMANCE OPTIMIZATION | 性能優化
+# ============================================================================
+performance:
+  # Connection pooling | 連接池
+  connection_pooling:
+    enabled: true
+    pool_size: 10
+    max_overflow: 20
+    
+  # Async processing | 異步處理
+  async_processing:
+    enabled: true
+    worker_threads: 4
+    queue_size: 1000
+    
+  # Compression | 壓縮
+  compression:
+    enabled: true
+    algorithm: "gzip"
+    level: 6
+    
+  # Batching | 批處理
+  batching:
+    enabled: true
+    batch_size: 100
+    batch_timeout: 1000  # 1 second
+    
+# ============================================================================
+# LOGGING & DEBUGGING | 日誌與調試
+# ============================================================================
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  
+  # Log destinations | 日誌目的地
+  destinations:
+    console: true
+    file: true
+    database: true
+    
+  # Log file settings | 日誌文件設置
+  file:
+    path: "/app/logs/forex-data-pipeline.log"
+    max_size_mb: 100
+    backup_count: 5
+    rotation: "time"  # time or size
+    
+  # Performance logging | 性能日誌
+  performance_logging:
+    enabled: true
+    log_slow_operations: true
+    slow_operation_threshold_ms: 1000
+    
+# ============================================================================
+# SECURITY | 安全設置
+# ============================================================================
+security:
+  # API key management | API密鑰管理
+  encrypt_api_keys: true
+  
+  # Rate limiting | 速率限制
+  rate_limiting:
+    enabled: true
+    default_limit: 1000  # requests per hour
+    
+  # IP restrictions | IP限制
+  ip_whitelist: []  # Empty means allow all
+  
+  # SSL/TLS | SSL/TLS
+  ssl_verify: true
+  ssl_cert_path: ""
+  
+# ============================================================================
+# TESTING & DEVELOPMENT | 測試與開發
+# ============================================================================
+development:
+  # Mock data for testing | 測試用模擬數據
+  enable_mock_data: false
+  mock_data_file: "test_data/mock_forex_data.json"
+  
+  # Development mode | 開發模式
+  debug_mode: false
+  verbose_logging: false
+  
+  # Testing configuration | 測試配置
+  test_mode: false
+  test_duration_seconds: 300  # 5 minutes for testing
+  
+# ============================================================================
+# MONITORING INTEGRATION | 監控整合
+# ============================================================================
+monitoring:
+  # Prometheus metrics | Prometheus指標
+  prometheus:
+    enabled: true
+    port: 8002
+    path: "/forex-metrics"
+    
+  # Custom metrics | 自定義指標
+  custom_metrics:
+    - name: "forex_data_latency_seconds"
+      type: "histogram"
+      description: "Latency of forex data updates"
+    - name: "forex_data_updates_total"  
+      type: "counter"
+      description: "Total number of forex data updates"
+    - name: "forex_connection_status"
+      type: "gauge"
+      description: "Status of forex data connections"

@@ -38,6 +38,8 @@ joblib>=1.1.0                # Model serialization | 模型序列化
 # Database Support | 資料庫支援
 sqlalchemy>=2.0.0            # SQL toolkit and ORM | SQL工具包和ORM
 pyodbc>=4.0.39               # SQL Server driver | SQL Server驅動程式
+redis>=4.5.0                 # Redis client for caching | Redis緩存客戶端
+psycopg2-binary>=2.9.0       # PostgreSQL adapter | PostgreSQL適配器
 
 # Time & Date Handling | 時間與日期處理  
 pytz>=2021.1                 # Timezone handling | 時區處理
@@ -45,6 +47,12 @@ python-dateutil>=2.8.0       # Date utilities | 日期工具
 
 # Logging & Monitoring | 日誌與監控
 structlog>=22.0.0            # Structured logging | 結構化日誌
+
+# Real-time Data Pipeline (Phase 4.2) | 實時數據管道（第四階段第二節）
+websocket-client>=1.5.0      # WebSocket client for real-time data | 實時數據WebSocket客戶端
+aiohttp>=3.8.0               # Async HTTP client | 異步HTTP客戶端  
+python-socketio>=5.8.0       # Socket.IO support | Socket.IO支援
+asyncio>=3.4.3               # Async programming support | 異步程式支援
 
 # Optional Advanced Packages (install separately if needed) | 可選高級包（需要時單獨安裝）
 # tensorflow>=2.10.0         # Deep learning framework | 深度學習框架
