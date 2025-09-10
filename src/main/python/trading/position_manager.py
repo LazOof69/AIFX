@@ -198,7 +198,7 @@ class PositionManager:
     提供全面的倉位管理。
     """
     
-    def __init__(self, ig_connector: IGMarketsConnector,
+    def __init__(self, ig_connector: Optional[IGMarketsConnector] = None,
                  max_positions: int = 10,
                  max_risk_per_position: float = 0.02,
                  max_total_risk: float = 0.06):
@@ -206,7 +206,7 @@ class PositionManager:
         Initialize Position Manager | 初始化倉位管理器
         
         Args:
-            ig_connector: IG Markets API connector | IG Markets API連接器
+            ig_connector: IG Markets API connector (None for demo mode) | IG Markets API連接器（演示模式為None）
             max_positions: Maximum number of open positions | 最大開倉數量
             max_risk_per_position: Maximum risk per position (as fraction of account) | 每個倉位的最大風險
             max_total_risk: Maximum total portfolio risk | 最大總投資組合風險
@@ -299,6 +299,10 @@ class PositionManager:
             
             for symbol in symbols:
                 try:
+                    # Skip market data updates in demo mode | 演示模式跳過市場數據更新
+                    if self.ig_connector is None:
+                        continue
+                        
                     market_data = await self.ig_connector.get_market_data(
                         self._map_symbol_to_epic(symbol)
                     )
@@ -376,7 +380,7 @@ class PositionManager:
             logger.info(f"🔄 Closing position {position_id}: {actual_close_size} of {position.current_size}")
             
             # Execute close via IG API | 通過IG API執行關閉
-            if position.deal_id:
+            if position.deal_id and self.ig_connector is not None:
                 close_result = await self.ig_connector.close_position(
                     position.deal_id, 
                     actual_close_size
@@ -511,10 +515,11 @@ class PositionManager:
             
             # Update account balance from IG if possible | 如果可能，從IG更新帳戶餘額
             try:
-                status = self.ig_connector.get_status()
-                account_info = status.get('account_info', {})
-                if 'balance' in account_info:
-                    self.account_balance = float(account_info['balance'])
+                if self.ig_connector is not None:
+                    status = self.ig_connector.get_status()
+                    account_info = status.get('account_info', {})
+                    if 'balance' in account_info:
+                        self.account_balance = float(account_info['balance'])
             except:
                 pass  # Keep existing balance if update fails
                 
