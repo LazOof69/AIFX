@@ -1120,6 +1120,404 @@ class IGMarketsConnector:
                 'http_status': None
             }
 
+    async def get_historical_prices(self, epic: str, resolution: str = "MINUTE", 
+                                   num_points: int = 10) -> Dict[str, Any]:
+        """
+        Get historical prices using REST API standards
+        使用 REST API 標準獲取歷史價格
+        
+        Endpoint: GET /prices/{epic}/{resolution}/{numPoints}
+        
+        Args:
+            epic: Instrument epic code | 交易工具代碼
+            resolution: Price resolution (MINUTE, HOUR, DAY) | 價格解析度
+            num_points: Number of data points | 數據點數量
+            
+        Returns:
+            Dict: Historical price data | 歷史價格數據
+        """
+        try:
+            # Use REST API authentication if available | 如果可用，使用 REST API 認證
+            if self.ig_service and self.auth_method == 'rest':
+                response = self.ig_service.fetch_historical_prices_by_epic_and_num_points(
+                    epic, resolution, num_points
+                )
+                
+                if response:
+                    return {
+                        'epic': epic,
+                        'resolution': resolution,
+                        'prices': response.get('prices', []),
+                        'source': 'REST_API',
+                        'metadata': response.get('metadata', {})
+                    }
+                    
+            # Use Web API OAuth if REST not available | 如果 REST 不可用，使用 Web API OAuth
+            elif self.web_api_connector and self.auth_method == 'oauth':
+                return await self._get_historical_prices_oauth(epic, resolution, num_points)
+                
+            else:
+                raise Exception("No valid authentication method available | 沒有可用的有效認證方法")
+                
+        except Exception as e:
+            logger.error(f"Failed to get historical prices for {epic}: {e}")
+            return {}
+
+    async def _get_historical_prices_oauth(self, epic: str, resolution: str, 
+                                         num_points: int) -> Dict[str, Any]:
+        """
+        Get historical prices using OAuth Web API
+        使用 OAuth Web API 獲取歷史價格
+        
+        Args:
+            epic: Instrument epic code | 交易工具代碼
+            resolution: Price resolution | 價格解析度
+            num_points: Number of data points | 數據點數量
+            
+        Returns:
+            Dict: Historical price data | 歷史價格數據
+        """
+        try:
+            account_type = 'demo' if 'demo' in str(self.config_path) else 'live'
+            base_url = "https://demo-api.ig.com" if 'demo' in account_type else "https://api.ig.com"
+            
+            # REST API endpoint for historical prices | 歷史價格的 REST API 端點
+            url = f"{base_url}/gateway/deal/prices/{epic}/{resolution}/{num_points}"
+            
+            headers = {
+                'Authorization': f'Bearer {self.web_api_connector.access_token}',
+                'Content-Type': 'application/json; charset=UTF-8',
+                'Accept': 'application/json; charset=UTF-8',
+                'X-IG-API-KEY': self.config['ig_markets']['demo']['api_key'],
+                'Version': '3'  # Use version 3 for historical prices
+            }
+            
+            response = self.web_api_connector.session.get(url, headers=headers, timeout=15)
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    return {
+                        'epic': epic,
+                        'resolution': resolution,
+                        'prices': data.get('prices', []),
+                        'source': 'OAUTH_API',
+                        'http_status': response.status_code,
+                        'metadata': data.get('metadata', {}),
+                        'validated': True
+                    }
+                    
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON response for historical prices")
+                    raise Exception("Invalid JSON response from IG API")
+                    
+            elif response.status_code == 404:
+                return {
+                    'error': f'Epic {epic} not found',
+                    'source': 'OAUTH_API',
+                    'http_status': response.status_code
+                }
+                
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                logger.error(f"Historical prices request failed: {error_msg}")
+                raise Exception(error_msg)
+                
+        except Exception as e:
+            logger.error(f"OAuth historical prices request failed: {e}")
+            raise
+
+    async def get_working_orders(self) -> Dict[str, Any]:
+        """
+        Get all working orders using REST API standards
+        使用 REST API 標準獲取所有工作訂單
+        
+        Endpoint: GET /working-orders
+        
+        Returns:
+            Dict: Working orders data | 工作訂單數據
+        """
+        try:
+            # Use REST API authentication if available | 如果可用，使用 REST API 認證
+            if self.ig_service and self.auth_method == 'rest':
+                response = self.ig_service.fetch_open_working_orders()
+                
+                if response:
+                    return {
+                        'working_orders': response.get('workingOrders', []),
+                        'source': 'REST_API',
+                        'count': len(response.get('workingOrders', []))
+                    }
+                    
+            # Use Web API OAuth if REST not available | 如果 REST 不可用，使用 Web API OAuth
+            elif self.web_api_connector and self.auth_method == 'oauth':
+                return await self._get_working_orders_oauth()
+                
+            else:
+                raise Exception("No valid authentication method available | 沒有可用的有效認證方法")
+                
+        except Exception as e:
+            logger.error(f"Failed to get working orders: {e}")
+            return {}
+
+    async def _get_working_orders_oauth(self) -> Dict[str, Any]:
+        """
+        Get working orders using OAuth Web API
+        使用 OAuth Web API 獲取工作訂單
+        
+        Returns:
+            Dict: Working orders data | 工作訂單數據
+        """
+        try:
+            account_type = 'demo' if 'demo' in str(self.config_path) else 'live'
+            base_url = "https://demo-api.ig.com" if 'demo' in account_type else "https://api.ig.com"
+            
+            # REST API endpoint for working orders | 工作訂單的 REST API 端點
+            url = f"{base_url}/gateway/deal/working-orders"
+            
+            headers = {
+                'Authorization': f'Bearer {self.web_api_connector.access_token}',
+                'Accept': 'application/json; charset=UTF-8',
+                'X-IG-API-KEY': self.config['ig_markets']['demo']['api_key'],
+                'Version': '2'  # Use version 2 for working orders
+            }
+            
+            response = self.web_api_connector.session.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    working_orders = data.get('workingOrders', [])
+                    
+                    return {
+                        'working_orders': working_orders,
+                        'source': 'OAUTH_API',
+                        'http_status': response.status_code,
+                        'count': len(working_orders),
+                        'validated': True
+                    }
+                    
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON response for working orders")
+                    raise Exception("Invalid JSON response from IG API")
+                    
+            elif response.status_code == 401:
+                logger.warning("OAuth token expired while fetching working orders")
+                raise Exception("OAuth token expired")
+                
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                logger.error(f"Working orders request failed: {error_msg}")
+                raise Exception(error_msg)
+                
+        except Exception as e:
+            logger.error(f"OAuth working orders request failed: {e}")
+            raise
+
+    async def search_markets(self, search_term: str) -> Dict[str, Any]:
+        """
+        Search markets using REST API standards
+        使用 REST API 標準搜索市場
+        
+        Endpoint: GET /markets?searchTerm={searchTerm}
+        
+        Args:
+            search_term: Search term for markets | 市場搜索詞
+            
+        Returns:
+            Dict: Market search results | 市場搜索結果
+        """
+        try:
+            # Use REST API authentication if available | 如果可用，使用 REST API 認證
+            if self.ig_service and self.auth_method == 'rest':
+                response = self.ig_service.search_markets(search_term)
+                
+                if response:
+                    return {
+                        'search_term': search_term,
+                        'markets': response.get('markets', []),
+                        'source': 'REST_API',
+                        'count': len(response.get('markets', []))
+                    }
+                    
+            # Use Web API OAuth if REST not available | 如果 REST 不可用，使用 Web API OAuth
+            elif self.web_api_connector and self.auth_method == 'oauth':
+                return await self._search_markets_oauth(search_term)
+                
+            else:
+                raise Exception("No valid authentication method available | 沒有可用的有效認證方法")
+                
+        except Exception as e:
+            logger.error(f"Failed to search markets for '{search_term}': {e}")
+            return {}
+
+    async def _search_markets_oauth(self, search_term: str) -> Dict[str, Any]:
+        """
+        Search markets using OAuth Web API
+        使用 OAuth Web API 搜索市場
+        
+        Args:
+            search_term: Search term | 搜索詞
+            
+        Returns:
+            Dict: Market search results | 市場搜索結果
+        """
+        try:
+            account_type = 'demo' if 'demo' in str(self.config_path) else 'live'
+            base_url = "https://demo-api.ig.com" if 'demo' in account_type else "https://api.ig.com"
+            
+            # REST API endpoint for market search | 市場搜索的 REST API 端點
+            url = f"{base_url}/gateway/deal/markets"
+            
+            headers = {
+                'Authorization': f'Bearer {self.web_api_connector.access_token}',
+                'Accept': 'application/json; charset=UTF-8',
+                'X-IG-API-KEY': self.config['ig_markets']['demo']['api_key'],
+                'Version': '1'  # Use version 1 for market search
+            }
+            
+            params = {'searchTerm': search_term}
+            
+            response = self.web_api_connector.session.get(
+                url, 
+                headers=headers, 
+                params=params, 
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    markets = data.get('markets', [])
+                    
+                    return {
+                        'search_term': search_term,
+                        'markets': markets,
+                        'source': 'OAUTH_API',
+                        'http_status': response.status_code,
+                        'count': len(markets),
+                        'validated': True
+                    }
+                    
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON response for market search")
+                    raise Exception("Invalid JSON response from IG API")
+                    
+            elif response.status_code == 401:
+                logger.warning("OAuth token expired while searching markets")
+                raise Exception("OAuth token expired")
+                
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                logger.error(f"Market search request failed: {error_msg}")
+                raise Exception(error_msg)
+                
+        except Exception as e:
+            logger.error(f"OAuth market search request failed: {e}")
+            raise
+
+    async def get_deal_confirmation(self, deal_reference: str) -> Dict[str, Any]:
+        """
+        Get deal confirmation using REST API standards
+        使用 REST API 標準獲取交易確認
+        
+        Endpoint: GET /confirms/{dealReference}
+        
+        Args:
+            deal_reference: Deal reference ID | 交易參考ID
+            
+        Returns:
+            Dict: Deal confirmation data | 交易確認數據
+        """
+        try:
+            # Use REST API authentication if available | 如果可用，使用 REST API 認證
+            if self.ig_service and self.auth_method == 'rest':
+                response = self.ig_service.fetch_deal_confirmation(deal_reference)
+                
+                if response:
+                    return {
+                        'deal_reference': deal_reference,
+                        'confirmation': response,
+                        'source': 'REST_API',
+                        'status': response.get('dealStatus', 'Unknown')
+                    }
+                    
+            # Use Web API OAuth if REST not available | 如果 REST 不可用，使用 Web API OAuth
+            elif self.web_api_connector and self.auth_method == 'oauth':
+                return await self._get_deal_confirmation_oauth(deal_reference)
+                
+            else:
+                raise Exception("No valid authentication method available | 沒有可用的有效認證方法")
+                
+        except Exception as e:
+            logger.error(f"Failed to get deal confirmation for {deal_reference}: {e}")
+            return {}
+
+    async def _get_deal_confirmation_oauth(self, deal_reference: str) -> Dict[str, Any]:
+        """
+        Get deal confirmation using OAuth Web API
+        使用 OAuth Web API 獲取交易確認
+        
+        Args:
+            deal_reference: Deal reference ID | 交易參考ID
+            
+        Returns:
+            Dict: Deal confirmation data | 交易確認數據
+        """
+        try:
+            account_type = 'demo' if 'demo' in str(self.config_path) else 'live'
+            base_url = "https://demo-api.ig.com" if 'demo' in account_type else "https://api.ig.com"
+            
+            # REST API endpoint for deal confirmation | 交易確認的 REST API 端點
+            url = f"{base_url}/gateway/deal/confirms/{deal_reference}"
+            
+            headers = {
+                'Authorization': f'Bearer {self.web_api_connector.access_token}',
+                'Accept': 'application/json; charset=UTF-8',
+                'X-IG-API-KEY': self.config['ig_markets']['demo']['api_key'],
+                'Version': '1'  # Use version 1 for deal confirmation
+            }
+            
+            response = self.web_api_connector.session.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    
+                    return {
+                        'deal_reference': deal_reference,
+                        'confirmation': data,
+                        'source': 'OAUTH_API',
+                        'http_status': response.status_code,
+                        'status': data.get('dealStatus', 'Unknown'),
+                        'validated': True
+                    }
+                    
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON response for deal confirmation")
+                    raise Exception("Invalid JSON response from IG API")
+                    
+            elif response.status_code == 404:
+                return {
+                    'deal_reference': deal_reference,
+                    'error': 'Deal confirmation not found',
+                    'source': 'OAUTH_API',
+                    'http_status': response.status_code
+                }
+                
+            elif response.status_code == 401:
+                logger.warning("OAuth token expired while fetching deal confirmation")
+                raise Exception("OAuth token expired")
+                
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                logger.error(f"Deal confirmation request failed: {error_msg}")
+                raise Exception(error_msg)
+                
+        except Exception as e:
+            logger.error(f"OAuth deal confirmation request failed: {e}")
+            raise
+
     async def disconnect(self):
         """Disconnect from IG Markets API | 斷開與 IG Markets API 的連接"""
         try:
