@@ -26,6 +26,7 @@ import requests
 import json
 import time
 from urllib.parse import urlencode, parse_qs, urlparse
+from jsonschema import validate, ValidationError
 
 try:
     from trading_ig import IGService
@@ -35,6 +36,79 @@ except ImportError as e:
 
 # Configure logging | 配置日誌
 logger = logging.getLogger(__name__)
+
+# JSON Schema validation for API responses | API 響應的 JSON Schema 驗證
+MARKET_DATA_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "instrument": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"}
+            },
+            "required": ["name"]
+        },
+        "snapshot": {
+            "type": "object",
+            "properties": {
+                "bid": {"type": ["number", "string"]},
+                "offer": {"type": ["number", "string"]},
+                "high": {"type": ["number", "string"]},
+                "low": {"type": ["number", "string"]},
+                "marketStatus": {"type": "string"}
+            },
+            "required": ["bid", "offer"]
+        }
+    },
+    "required": ["instrument", "snapshot"]
+}
+
+ORDER_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "dealReference": {"type": "string"},
+        "reason": {"type": "string"}
+    },
+    "required": ["dealReference"]
+}
+
+POSITIONS_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "positions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "position": {
+                        "type": "object",
+                        "properties": {
+                            "dealId": {"type": "string"},
+                            "direction": {"type": "string"},
+                            "size": {"type": ["number", "string"]},
+                            "level": {"type": ["number", "string"]},
+                            "unrealisedPL": {"type": ["number", "string"]},
+                            "currency": {"type": "string"}
+                        },
+                        "required": ["dealId", "direction", "size"]
+                    },
+                    "market": {
+                        "type": "object",
+                        "properties": {
+                            "epic": {"type": "string"},
+                            "instrumentName": {"type": "string"},
+                            "bid": {"type": ["number", "string"]},
+                            "offer": {"type": ["number", "string"]}
+                        },
+                        "required": ["epic", "instrumentName"]
+                    }
+                },
+                "required": ["position", "market"]
+            }
+        }
+    },
+    "required": ["positions"]
+}
 
 class IGConnectionStatus(Enum):
     """IG connection status enumeration | IG 連接狀態枚舉"""
@@ -91,6 +165,46 @@ class IGOrder:
     take_profit: Optional[float] = None
     currency_code: str = "GBP"
     force_open: bool = True
+
+def validate_json_response(response_data: Dict[str, Any], schema: Dict[str, Any]) -> bool:
+    """
+    Validate JSON response against schema
+    根據模式驗證 JSON 響應
+    
+    Args:
+        response_data: JSON response data | JSON 響應數據
+        schema: JSON Schema to validate against | 用於驗證的 JSON Schema
+        
+    Returns:
+        bool: True if valid, False otherwise | 如果有效則返回 True，否則返回 False
+    """
+    try:
+        validate(instance=response_data, schema=schema)
+        return True
+    except ValidationError as e:
+        logger.warning(f"JSON validation failed: {e.message}")
+        return False
+    except Exception as e:
+        logger.error(f"JSON validation error: {e}")
+        return False
+
+def safe_float_conversion(value: Union[str, int, float], default: float = 0.0) -> float:
+    """
+    Safely convert value to float with proper error handling
+    安全地將值轉換為浮點數並進行適當的錯誤處理
+    
+    Args:
+        value: Value to convert | 要轉換的值
+        default: Default value if conversion fails | 轉換失敗時的默認值
+        
+    Returns:
+        float: Converted value or default | 轉換後的值或默認值
+    """
+    try:
+        return float(value) if value is not None else default
+    except (ValueError, TypeError):
+        logger.warning(f"Failed to convert {value} to float, using default {default}")
+        return default
 
 class IGWebAPIConnector:
     """
@@ -354,8 +468,64 @@ class IGMarketsConnector:
 
     async def get_market_data(self, epic: str) -> Dict[str, Any]:
         """
-        Get market data for an instrument
-        獲取交易工具的市場數據
+        Get market data for an instrument using REST API standards
+        使用 REST API 標準獲取交易工具的市場數據
+        
+        This method follows IG's REST API guide:
+        - GET HTTP request to https://api.ig.com/gateway/deal/markets/{epic}
+        - JSON response format handling
+        - Proper error handling and status codes
+        
+        Args:
+            epic: Instrument epic code | 交易工具代碼
+            
+        Returns:
+            Dict: Market data following REST standards | 遵循 REST 標準的市場數據
+        """
+        try:
+            # Use REST API authentication if available | 如果可用，使用 REST API 認證
+            if self.ig_service and self.auth_method == 'rest':
+                response = self.ig_service.fetch_market_by_epic(epic)
+                
+                if response:
+                    instrument = response['instrument']
+                    snapshot = response['snapshot']
+                    
+                    return {
+                        'epic': epic,
+                        'instrument_name': instrument['name'],
+                        'bid': float(snapshot['bid']),
+                        'ask': float(snapshot['offer']),
+                        'mid': (float(snapshot['bid']) + float(snapshot['offer'])) / 2,
+                        'high': float(snapshot['high']),
+                        'low': float(snapshot['low']),
+                        'timestamp': datetime.now(),
+                        'market_status': snapshot['marketStatus'],
+                        'source': 'REST_API'
+                    }
+                else:
+                    raise Exception(f"No data for epic {epic}")
+            
+            # Use Web API OAuth if REST not available | 如果 REST 不可用，使用 Web API OAuth
+            elif self.web_api_connector and self.auth_method == 'oauth':
+                return await self._get_market_data_oauth(epic)
+            
+            else:
+                raise Exception("No valid authentication method available | 沒有可用的有效認證方法")
+                
+        except Exception as e:
+            logger.error(f"Failed to get market data for {epic}: {e}")
+            return {}
+
+    async def _get_market_data_oauth(self, epic: str) -> Dict[str, Any]:
+        """
+        Get market data using OAuth Web API (REST compliant)
+        使用 OAuth Web API 獲取市場數據（符合 REST 標準）
+        
+        Implements REST principles:
+        - GET request to resource endpoint
+        - JSON response handling
+        - Proper HTTP status code validation
         
         Args:
             epic: Instrument epic code | 交易工具代碼
@@ -364,52 +534,121 @@ class IGMarketsConnector:
             Dict: Market data | 市場數據
         """
         try:
-            if not self.ig_service:
-                raise Exception("Not connected to IG | 未連接到 IG")
-                
-            response = self.ig_service.fetch_market_by_epic(epic)
+            account_type = 'demo' if 'demo' in str(self.config_path) else 'live'
+            base_url = "https://demo-api.ig.com" if 'demo' in account_type else "https://api.ig.com"
             
-            if response:
-                instrument = response['instrument']
-                snapshot = response['snapshot']
+            # REST API endpoint for markets | 市場的 REST API 端點
+            url = f"{base_url}/gateway/deal/markets/{epic}"
+            
+            headers = {
+                'Authorization': f'Bearer {self.web_api_connector.access_token}',
+                'Content-Type': 'application/json; charset=UTF-8',
+                'Accept': 'application/json; charset=UTF-8',
+                'X-IG-API-KEY': self.config['ig_markets']['demo']['api_key'],
+                'Version': '3'  # Use version 3 for comprehensive market data
+            }
+            
+            response = self.web_api_connector.session.get(url, headers=headers, timeout=10)
+            
+            # REST API standard response handling with JSON validation | REST API 標準響應處理並進行 JSON 驗證
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    
+                    # Validate response structure | 驗證響應結構
+                    if validate_json_response(data, MARKET_DATA_SCHEMA):
+                        instrument = data.get('instrument', {})
+                        snapshot = data.get('snapshot', {})
+                        
+                        # Use safe float conversion | 使用安全浮點數轉換
+                        bid = safe_float_conversion(snapshot.get('bid', 0))
+                        ask = safe_float_conversion(snapshot.get('offer', 0))
+                        
+                        return {
+                            'epic': epic,
+                            'instrument_name': instrument.get('name', 'Unknown'),
+                            'bid': bid,
+                            'ask': ask,
+                            'mid': (bid + ask) / 2 if bid > 0 and ask > 0 else 0,
+                            'high': safe_float_conversion(snapshot.get('high', 0)),
+                            'low': safe_float_conversion(snapshot.get('low', 0)),
+                            'timestamp': datetime.now(),
+                            'market_status': snapshot.get('marketStatus', 'UNKNOWN'),
+                            'source': 'OAUTH_API',
+                            'http_status': response.status_code,
+                            'validated': True
+                        }
+                    else:
+                        logger.warning(f"Market data response validation failed for {epic}")
+                        return {
+                            'epic': epic,
+                            'error': 'Invalid response structure',
+                            'source': 'OAUTH_API',
+                            'http_status': response.status_code,
+                            'validated': False
+                        }
+                        
+                except json.JSONDecodeError:
+                    logger.error(f"Invalid JSON response for market data: {epic}")
+                    raise Exception("Invalid JSON response from IG API")
                 
-                return {
-                    'epic': epic,
-                    'instrument_name': instrument['name'],
-                    'bid': float(snapshot['bid']),
-                    'ask': float(snapshot['offer']),
-                    'mid': (float(snapshot['bid']) + float(snapshot['offer'])) / 2,
-                    'high': float(snapshot['high']),
-                    'low': float(snapshot['low']),
-                    'timestamp': datetime.now(),
-                    'market_status': snapshot['marketStatus']
-                }
+            elif response.status_code == 401:
+                # Token might be expired | 令牌可能已過期
+                logger.warning("OAuth token expired, attempting refresh | OAuth 令牌已過期，嘗試刷新")
+                # TODO: Implement token refresh logic
+                raise Exception("OAuth token expired | OAuth 令牌已過期")
+                
             else:
-                raise Exception(f"No data for epic {epic}")
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                logger.error(f"Market data request failed: {error_msg}")
+                raise Exception(error_msg)
                 
         except Exception as e:
-            logger.error(f"Failed to get market data for {epic}: {e}")
-            return {}
+            logger.error(f"OAuth market data request failed for {epic}: {e}")
+            raise
 
     async def place_order(self, order: IGOrder) -> Dict[str, Any]:
         """
-        Place a trading order
-        下達交易訂單
+        Place a trading order using REST API standards
+        使用 REST API 標準下達交易訂單
+        
+        This method follows IG's REST API guide:
+        - POST HTTP request to https://api.ig.com/gateway/deal/positions/otc
+        - JSON request and response format
+        - Proper HTTP status code handling
         
         Args:
             order: Order details | 訂單詳情
             
         Returns:
-            Dict: Order result | 訂單結果
+            Dict: Order result following REST standards | 遵循 REST 標準的訂單結果
         """
         try:
-            if not self.ig_service:
-                raise Exception("Not connected to IG | 未連接到 IG")
-            
-            # Check risk limits | 檢查風險限制
+            # Check risk limits first | 首先檢查風險限制
             if not self._check_risk_limits(order):
                 raise Exception("Order violates risk limits | 訂單違反風險限制")
             
+            # Use REST API authentication if available | 如果可用，使用 REST API 認證
+            if self.ig_service and self.auth_method == 'rest':
+                return await self._place_order_rest(order)
+            
+            # Use Web API OAuth if REST not available | 如果 REST 不可用，使用 Web API OAuth
+            elif self.web_api_connector and self.auth_method == 'oauth':
+                return await self._place_order_oauth(order)
+            
+            else:
+                raise Exception("No valid authentication method available | 沒有可用的有效認證方法")
+                
+        except Exception as e:
+            logger.error(f"Failed to place order: {e}")
+            return {'success': False, 'reason': str(e), 'http_status': None}
+
+    async def _place_order_rest(self, order: IGOrder) -> Dict[str, Any]:
+        """
+        Place order using REST API (trading-ig library)
+        使用 REST API 下單（trading-ig 庫）
+        """
+        try:
             # Prepare order request | 準備訂單請求
             request = {
                 'epic': order.epic,
@@ -432,7 +671,7 @@ class IGMarketsConnector:
             response = self.ig_service.create_open_position(**request)
             
             if response and response.get('dealReference'):
-                logger.info(f"Order placed successfully: {response['dealReference']}")
+                logger.info(f"REST order placed successfully: {response['dealReference']}")
                 
                 # Update positions | 更新倉位
                 await self._update_positions()
@@ -440,17 +679,157 @@ class IGMarketsConnector:
                 return {
                     'success': True,
                     'deal_reference': response['dealReference'],
-                    'reason': response.get('reason', 'Order placed')
+                    'reason': response.get('reason', 'Order placed'),
+                    'source': 'REST_API',
+                    'http_status': 200
                 }
             else:
                 return {
                     'success': False,
-                    'reason': response.get('reason', 'Unknown error')
+                    'reason': response.get('reason', 'Unknown error'),
+                    'source': 'REST_API',
+                    'http_status': None
                 }
                 
         except Exception as e:
-            logger.error(f"Failed to place order: {e}")
-            return {'success': False, 'reason': str(e)}
+            logger.error(f"REST order placement failed: {e}")
+            return {'success': False, 'reason': str(e), 'source': 'REST_API'}
+
+    async def _place_order_oauth(self, order: IGOrder) -> Dict[str, Any]:
+        """
+        Place order using OAuth Web API (REST compliant)
+        使用 OAuth Web API 下單（符合 REST 標準）
+        
+        Implements REST principles:
+        - POST request to positions endpoint
+        - JSON request body
+        - Proper HTTP status code validation
+        
+        Args:
+            order: Order details | 訂單詳情
+            
+        Returns:
+            Dict: Order result | 訂單結果
+        """
+        try:
+            account_type = 'demo' if 'demo' in str(self.config_path) else 'live'
+            base_url = "https://demo-api.ig.com" if 'demo' in account_type else "https://api.ig.com"
+            
+            # REST API endpoint for creating positions | 創建倉位的 REST API 端點
+            url = f"{base_url}/gateway/deal/positions/otc"
+            
+            headers = {
+                'Authorization': f'Bearer {self.web_api_connector.access_token}',
+                'Content-Type': 'application/json; charset=UTF-8',
+                'Accept': 'application/json; charset=UTF-8',
+                'X-IG-API-KEY': self.config['ig_markets']['demo']['api_key'],
+                'Version': '2'  # Use version 2 for position creation
+            }
+            
+            # Prepare JSON request body following IG REST API specification
+            # 根據 IG REST API 規範準備 JSON 請求體
+            payload = {
+                'epic': order.epic,
+                'direction': order.direction.value,
+                'size': str(order.size),  # Size as string per IG API spec
+                'orderType': order.order_type.value,
+                'currencyCode': order.currency_code,
+                'forceOpen': order.force_open
+            }
+            
+            # Add optional parameters | 添加可選參數
+            if order.level:
+                payload['level'] = str(order.level)
+            if order.stop_loss:
+                payload['stopLevel'] = str(order.stop_loss)
+            if order.take_profit:
+                payload['limitLevel'] = str(order.take_profit)
+            
+            # Execute POST request | 執行 POST 請求
+            response = self.web_api_connector.session.post(
+                url, 
+                headers=headers, 
+                json=payload, 
+                timeout=15
+            )
+            
+            # REST API standard response handling | REST API 標準響應處理
+            if response.status_code == 200:
+                data = response.json()
+                deal_reference = data.get('dealReference')
+                
+                if deal_reference:
+                    logger.info(f"OAuth order placed successfully: {deal_reference}")
+                    
+                    # Update positions | 更新倉位
+                    await self._update_positions()
+                    
+                    return {
+                        'success': True,
+                        'deal_reference': deal_reference,
+                        'reason': data.get('reason', 'Order placed via OAuth'),
+                        'source': 'OAUTH_API',
+                        'http_status': response.status_code
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'reason': data.get('errorCode', 'No deal reference returned'),
+                        'source': 'OAUTH_API',
+                        'http_status': response.status_code
+                    }
+                    
+            elif response.status_code == 400:
+                # Bad request - validation error | 錯誤請求 - 驗證錯誤
+                error_data = response.json() if response.text else {}
+                error_msg = error_data.get('errorCode', 'Invalid order parameters')
+                logger.error(f"Order validation failed: {error_msg}")
+                
+                return {
+                    'success': False,
+                    'reason': f"Validation error: {error_msg}",
+                    'source': 'OAUTH_API',
+                    'http_status': response.status_code
+                }
+                
+            elif response.status_code == 401:
+                # Unauthorized - token expired | 未授權 - 令牌過期
+                logger.warning("OAuth token expired during order placement | 下單時 OAuth 令牌過期")
+                return {
+                    'success': False,
+                    'reason': 'OAuth token expired',
+                    'source': 'OAUTH_API',
+                    'http_status': response.status_code
+                }
+                
+            elif response.status_code == 403:
+                # Forbidden - insufficient permissions | 禁止 - 權限不足
+                return {
+                    'success': False,
+                    'reason': 'Insufficient permissions for trading',
+                    'source': 'OAUTH_API',
+                    'http_status': response.status_code
+                }
+                
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                logger.error(f"Order placement failed: {error_msg}")
+                
+                return {
+                    'success': False,
+                    'reason': error_msg,
+                    'source': 'OAUTH_API',
+                    'http_status': response.status_code
+                }
+                
+        except Exception as e:
+            logger.error(f"OAuth order placement failed: {e}")
+            return {
+                'success': False,
+                'reason': str(e),
+                'source': 'OAUTH_API',
+                'http_status': None
+            }
 
     def _check_risk_limits(self, order: IGOrder) -> bool:
         """
@@ -515,23 +894,46 @@ class IGMarketsConnector:
 
     async def close_position(self, deal_id: str, size: Optional[float] = None) -> Dict[str, Any]:
         """
-        Close a position
-        平倉
+        Close a position using REST API standards
+        使用 REST API 標準平倉
+        
+        This method follows IG's REST API guide:
+        - DELETE HTTP request to https://api.ig.com/gateway/deal/positions/otc
+        - Or POST request to close endpoint with proper JSON payload
+        - Proper HTTP status code handling
         
         Args:
             deal_id: Deal ID to close | 要平倉的交易ID
             size: Partial close size (optional) | 部分平倉大小（可選）
             
         Returns:
-            Dict: Close result | 平倉結果
+            Dict: Close result following REST standards | 遵循 REST 標準的平倉結果
         """
         try:
-            if not self.ig_service:
-                raise Exception("Not connected to IG | 未連接到 IG")
-            
             if deal_id not in self.positions:
                 raise Exception(f"Position {deal_id} not found | 未找到倉位 {deal_id}")
             
+            # Use REST API authentication if available | 如果可用，使用 REST API 認證
+            if self.ig_service and self.auth_method == 'rest':
+                return await self._close_position_rest(deal_id, size)
+            
+            # Use Web API OAuth if REST not available | 如果 REST 不可用，使用 Web API OAuth
+            elif self.web_api_connector and self.auth_method == 'oauth':
+                return await self._close_position_oauth(deal_id, size)
+            
+            else:
+                raise Exception("No valid authentication method available | 沒有可用的有效認證方法")
+                
+        except Exception as e:
+            logger.error(f"Failed to close position {deal_id}: {e}")
+            return {'success': False, 'reason': str(e), 'http_status': None}
+
+    async def _close_position_rest(self, deal_id: str, size: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Close position using REST API (trading-ig library)
+        使用 REST API 平倉（trading-ig 庫）
+        """
+        try:
             position = self.positions[deal_id]
             close_size = size or position.size
             
@@ -546,7 +948,7 @@ class IGMarketsConnector:
             )
             
             if response and response.get('dealReference'):
-                logger.info(f"Position {deal_id} closed successfully")
+                logger.info(f"REST position {deal_id} closed successfully")
                 
                 # Update positions | 更新倉位
                 await self._update_positions()
@@ -554,17 +956,169 @@ class IGMarketsConnector:
                 return {
                     'success': True,
                     'deal_reference': response['dealReference'],
-                    'reason': response.get('reason', 'Position closed')
+                    'reason': response.get('reason', 'Position closed'),
+                    'source': 'REST_API',
+                    'http_status': 200
                 }
             else:
                 return {
                     'success': False,
-                    'reason': response.get('reason', 'Unknown error')
+                    'reason': response.get('reason', 'Unknown error'),
+                    'source': 'REST_API',
+                    'http_status': None
                 }
                 
         except Exception as e:
-            logger.error(f"Failed to close position {deal_id}: {e}")
-            return {'success': False, 'reason': str(e)}
+            logger.error(f"REST position close failed: {e}")
+            return {'success': False, 'reason': str(e), 'source': 'REST_API'}
+
+    async def _close_position_oauth(self, deal_id: str, size: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Close position using OAuth Web API (REST compliant)
+        使用 OAuth Web API 平倉（符合 REST 標準）
+        
+        Implements REST principles:
+        - DELETE or POST request to positions endpoint
+        - JSON request body for close parameters
+        - Proper HTTP status code validation
+        
+        Args:
+            deal_id: Deal ID to close | 要平倉的交易ID
+            size: Partial close size (optional) | 部分平倉大小（可選）
+            
+        Returns:
+            Dict: Close result | 平倉結果
+        """
+        try:
+            position = self.positions[deal_id]
+            close_size = size or position.size
+            
+            account_type = 'demo' if 'demo' in str(self.config_path) else 'live'
+            base_url = "https://demo-api.ig.com" if 'demo' in account_type else "https://api.ig.com"
+            
+            # REST API endpoint for closing positions | 平倉的 REST API 端點
+            url = f"{base_url}/gateway/deal/positions/otc"
+            
+            headers = {
+                'Authorization': f'Bearer {self.web_api_connector.access_token}',
+                'Content-Type': 'application/json; charset=UTF-8',
+                'Accept': 'application/json; charset=UTF-8',
+                'X-IG-API-KEY': self.config['ig_markets']['demo']['api_key'],
+                'Version': '1',  # Use version 1 for position closure
+                '_method': 'DELETE'  # Override HTTP method for position closure
+            }
+            
+            # Determine close direction | 確定平倉方向
+            close_direction = "SELL" if position.direction == "BUY" else "BUY"
+            
+            # Prepare JSON request body following IG REST API specification
+            # 根據 IG REST API 規範準備 JSON 請求體
+            payload = {
+                'dealId': deal_id,
+                'direction': close_direction,
+                'size': str(close_size),  # Size as string per IG API spec
+                'orderType': 'MARKET'
+            }
+            
+            # Execute DELETE request (using POST with _method override) | 執行 DELETE 請求（使用 POST 並覆蓋方法）
+            response = self.web_api_connector.session.post(
+                url, 
+                headers=headers, 
+                json=payload, 
+                timeout=15
+            )
+            
+            # REST API standard response handling | REST API 標準響應處理
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    deal_reference = data.get('dealReference')
+                    
+                    if deal_reference:
+                        logger.info(f"OAuth position {deal_id} closed successfully: {deal_reference}")
+                        
+                        # Update positions | 更新倉位
+                        await self._update_positions()
+                        
+                        return {
+                            'success': True,
+                            'deal_reference': deal_reference,
+                            'reason': data.get('reason', 'Position closed via OAuth'),
+                            'source': 'OAUTH_API',
+                            'http_status': response.status_code,
+                            'validated': True
+                        }
+                    else:
+                        return {
+                            'success': False,
+                            'reason': data.get('errorCode', 'No deal reference returned'),
+                            'source': 'OAUTH_API',
+                            'http_status': response.status_code
+                        }
+                        
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON response for position close")
+                    return {
+                        'success': False,
+                        'reason': 'Invalid JSON response from IG API',
+                        'source': 'OAUTH_API',
+                        'http_status': response.status_code
+                    }
+                    
+            elif response.status_code == 400:
+                # Bad request - validation error | 錯誤請求 - 驗證錯誤
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('errorCode', 'Invalid close parameters')
+                except:
+                    error_msg = 'Invalid close parameters'
+                
+                logger.error(f"Position close validation failed: {error_msg}")
+                return {
+                    'success': False,
+                    'reason': f"Validation error: {error_msg}",
+                    'source': 'OAUTH_API',
+                    'http_status': response.status_code
+                }
+                
+            elif response.status_code == 401:
+                # Unauthorized - token expired | 未授權 - 令牌過期
+                logger.warning("OAuth token expired during position close | 平倉時 OAuth 令牌過期")
+                return {
+                    'success': False,
+                    'reason': 'OAuth token expired',
+                    'source': 'OAUTH_API',
+                    'http_status': response.status_code
+                }
+                
+            elif response.status_code == 404:
+                # Not found - position doesn't exist | 未找到 - 倉位不存在
+                return {
+                    'success': False,
+                    'reason': f'Position {deal_id} not found on server',
+                    'source': 'OAUTH_API',
+                    'http_status': response.status_code
+                }
+                
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                logger.error(f"Position close failed: {error_msg}")
+                
+                return {
+                    'success': False,
+                    'reason': error_msg,
+                    'source': 'OAUTH_API',
+                    'http_status': response.status_code
+                }
+                
+        except Exception as e:
+            logger.error(f"OAuth position close failed: {e}")
+            return {
+                'success': False,
+                'reason': str(e),
+                'source': 'OAUTH_API',
+                'http_status': None
+            }
 
     async def disconnect(self):
         """Disconnect from IG Markets API | 斷開與 IG Markets API 的連接"""

@@ -34,6 +34,7 @@ pyyaml>=6.0                  # YAML configuration | YAML配置
 requests>=2.25.0             # HTTP requests | HTTP請求
 tqdm>=4.60.0                 # Progress bars | 進度條
 joblib>=1.1.0                # Model serialization | 模型序列化
+jsonschema>=4.0.0            # JSON schema validation | JSON模式驗證
 
 # Database Support | 資料庫支援
 sqlalchemy>=2.0.0            # SQL toolkit and ORM | SQL工具包和ORM
