@@ -66,12 +66,12 @@ class AIFXTradingSystem:
     協調完整的交易工作流程。
     """
     
-    def __init__(self, config_path: str, mode: str = TradingSystemMode.PAPER):
+    def __init__(self, config_path: Optional[str] = None, mode: str = TradingSystemMode.PAPER):
         """
         Initialize AIFX Trading System | 初始化AIFX交易系統
         
         Args:
-            config_path: Path to trading configuration | 交易配置路徑
+            config_path: Path to trading configuration (None for demo mode) | 交易配置路徑（演示模式為None）
             mode: Trading system mode | 交易系統模式
         """
         self.config_path = config_path
@@ -214,6 +214,12 @@ class AIFXTradingSystem:
     async def _initialize_ig_connector(self) -> bool:
         """Initialize IG Markets connector | 初始化IG Markets連接器"""
         try:
+            # Skip IG connector initialization for demo mode without config | 演示模式無配置時跳過IG連接器初始化
+            if self.config_path is None:
+                logger.info("📝 Demo mode: Skipping IG Markets API connection...")
+                self.ig_connector = None
+                return True
+            
             logger.info("🔗 Initializing IG Markets API connection...")
             
             self.ig_connector = create_ig_connector(self.config_path)

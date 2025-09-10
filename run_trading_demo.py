@@ -416,7 +416,7 @@ class AIFXTradingDemo:
             # Close dashboard
             # 關閉儀表板
             if self.dashboard:
-                await self.dashboard.stop_monitoring()
+                await self.dashboard.stop()
                 
             # Close position manager
             # 關閉倉位管理器
