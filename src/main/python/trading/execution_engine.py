@@ -79,18 +79,18 @@ class ExecutionEngine:
     """
     
     def __init__(self, 
-                 ig_connector: IGMarketsConnector,
-                 live_trader: LiveTrader,
-                 position_manager: PositionManager,
+                 ig_connector: Optional[IGMarketsConnector] = None,
+                 live_trader: Optional[LiveTrader] = None,
+                 position_manager: Optional[PositionManager] = None,
                  max_concurrent_executions: int = 3,
                  circuit_breaker_threshold: int = 5):
         """
         Initialize Execution Engine | 初始化執行引擎
         
         Args:
-            ig_connector: IG Markets API connector | IG Markets API連接器
-            live_trader: Live trading executor | 實時交易執行器
-            position_manager: Position management system | 倉位管理系統
+            ig_connector: IG Markets API connector (None for demo mode) | IG Markets API連接器（演示模式為None）
+            live_trader: Live trading executor (None for demo mode) | 實時交易執行器（演示模式為None）
+            position_manager: Position management system (None for demo mode) | 倉位管理系統（演示模式為None）
             max_concurrent_executions: Maximum concurrent executions | 最大併發執行數
             circuit_breaker_threshold: Failed executions before circuit break | 斷路前的失敗執行數
         """

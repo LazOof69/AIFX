@@ -85,14 +85,14 @@ class LiveTrader:
     在實時市場中處理交易決策的執行。
     """
     
-    def __init__(self, ig_connector: IGMarketsConnector, 
+    def __init__(self, ig_connector: Optional[IGMarketsConnector] = None, 
                  max_position_size: float = 10000.0,
                  max_orders_per_minute: int = 10):
         """
         Initialize Live Trader | 初始化實時交易器
         
         Args:
-            ig_connector: IG Markets API connector | IG Markets API連接器
+            ig_connector: IG Markets API connector (None for demo mode) | IG Markets API連接器（演示模式為None）
             max_position_size: Maximum position size per trade | 每筆交易的最大倉位
             max_orders_per_minute: Rate limit for order submission | 訂單提交的速率限制
         """
