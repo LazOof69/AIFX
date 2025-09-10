@@ -673,6 +673,54 @@ class TechnicalIndicators:
             return df
         
         return signals_df
+    
+    # =============================================================================
+    # MISSING METHOD ALIASES | 缺失方法別名
+    # =============================================================================
+    
+    def cci(
+        self,
+        high: pd.Series,
+        low: pd.Series,
+        close: pd.Series,
+        period: int = 20
+    ) -> pd.Series:
+        """
+        Commodity Channel Index | 商品通道指標
+        
+        Args:
+            high: High price series | 最高價序列
+            low: Low price series | 最低價序列  
+            close: Close price series | 收盤價序列
+            period: Period for calculation | 計算週期
+            
+        Returns:
+            CCI series | CCI序列
+        """
+        try:
+            typical_price = (high + low + close) / 3
+            sma_tp = typical_price.rolling(window=period).mean()
+            mean_deviation = typical_price.rolling(window=period).apply(
+                lambda x: np.mean(np.abs(x - x.mean())), raw=False
+            )
+            cci = (typical_price - sma_tp) / (0.015 * mean_deviation)
+            return cci.fillna(0)
+        except Exception as e:
+            self.logger.error(f"Error calculating CCI | 計算CCI時出錯: {str(e)}")
+            return pd.Series(index=close.index, data=0)
+    
+    def obv(self, close: pd.Series, volume: pd.Series) -> pd.Series:
+        """
+        On-Balance Volume alias for on_balance_volume | 能量潮指標別名
+        
+        Args:
+            close: Close price series | 收盤價序列
+            volume: Volume series | 成交量序列
+            
+        Returns:
+            OBV series | OBV序列
+        """
+        return self.on_balance_volume(close, volume)
 
 
 # Convenience functions | 便利函數

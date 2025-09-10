@@ -35,8 +35,8 @@ try:
     from trading.position_manager import PositionManager  
     from trading.execution_engine import ExecutionEngine, ExecutionMode
     from monitoring.dashboard import TradingDashboard
-    from core.config_manager import ConfigManager
-    from utils.logger import setup_logger
+    from utils.config import Config as ConfigManager
+    from utils.logger import get_logger
     from services.ig_api import IGMarketsAPI
     from utils.data_loader import DataLoader
 except ImportError as e:
@@ -53,7 +53,7 @@ class AIFXIntegrationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test environment"""
-        cls.logger = setup_logger("AIFX_Integration_Test")
+        cls.logger = get_logger("AIFX_Integration_Test")
         cls.logger.info("🧪 Setting up AIFX Integration Test Environment...")
         cls.logger.info("🧪 正在設置AIFX集成測試環境...")
         

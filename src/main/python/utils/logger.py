@@ -443,3 +443,16 @@ if __name__ == "__main__":
         confidence=0.68,
         features_count=25
     )
+
+
+def setup_logger(logger_name: str = "AIFX") -> AIFXLogger:
+    """
+    Setup AIFX logger instance (alias for get_logger) | 設置AIFX日誌記錄器實例（get_logger的別名）
+    
+    Args:
+        logger_name: Name of the logger | 記錄器名稱
+        
+    Returns:
+        AIFXLogger instance | AIFXLogger實例
+    """
+    return get_logger(logger_name)

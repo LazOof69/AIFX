@@ -37,7 +37,7 @@ try:
     from trading.position_manager import PositionManager
     from trading.execution_engine import ExecutionEngine
     from monitoring.dashboard import TradingDashboard
-    from core.config_manager import ConfigManager
+    from utils.config import Config as ConfigManager
     from utils.logger import setup_logger
 except ImportError as e:
     print(f"❌ Import Error: {e}")
