@@ -70,6 +70,13 @@ mlruns/
 *.tar.gz
 *.parquet
 
+# API Credentials and Trading Config (SECURITY)
+config/trading-config.yaml
+*.api-key
+*.credentials
+.env
+.env.local
+
 # Temporary files
 tmp/
 temp/

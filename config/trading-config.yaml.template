@@ -1,0 +1,50 @@
+# AIFX Trading API Configuration Template
+# AIFX 交易 API 配置模板
+#
+# SECURITY NOTE: Never commit actual API keys to version control
+# 安全提醒：絕不要將實際 API 密鑰提交到版本控制
+
+# IG Markets Configuration | IG Markets 配置
+ig_markets:
+  # Demo account settings | 模擬帳戶設置
+  demo:
+    enabled: true
+    api_url: "https://demo-api.ig.com/gateway/deal"
+    api_key: "YOUR_API_KEY_HERE"  # Replace with your actual API key | 替換為您的實際 API 密鑰
+    username: "YOUR_USERNAME"     # Your IG username | 您的 IG 用戶名
+    password: "YOUR_PASSWORD"     # Your IG password | 您的 IG 密碼
+    
+  # Live account settings (disabled by default) | 實盤帳戶設置（預設禁用）
+  live:
+    enabled: false
+    api_url: "https://api.ig.com/gateway/deal"
+    api_key: "YOUR_LIVE_API_KEY"
+    username: "YOUR_LIVE_USERNAME"
+    password: "YOUR_LIVE_PASSWORD"
+
+# Trading Parameters | 交易參數
+trading:
+  # Risk Management | 風險管理
+  max_position_size: 1000      # Maximum position size | 最大倉位
+  max_daily_trades: 10         # Maximum trades per day | 每日最大交易次數
+  stop_loss_pips: 50           # Default stop loss in pips | 預設止損點數
+  take_profit_pips: 100        # Default take profit in pips | 預設止盈點數
+  
+  # Supported instruments | 支援的交易工具
+  instruments:
+    - "EUR/USD"
+    - "USD/JPY" 
+    - "GBP/USD"
+    - "USD/CHF"
+    - "AUD/USD"
+
+# Rate Limiting | 速率限制
+rate_limiting:
+  requests_per_minute: 60      # Demo account limit | 模擬帳戶限制
+  burst_limit: 10              # Burst request limit | 突發請求限制
+
+# Logging | 日誌設置
+logging:
+  level: "INFO"
+  log_trades: true             # Log all trade activities | 記錄所有交易活動
+  log_prices: true             # Log price updates | 記錄價格更新
