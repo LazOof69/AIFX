@@ -20,9 +20,11 @@ try:
     from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
     from tensorflow.keras.regularizers import l2
     TENSORFLOW_AVAILABLE = True
+    logger.info("✅ TensorFlow available - LSTM model fully operational")
 except ImportError:
     TENSORFLOW_AVAILABLE = False
-    warnings.warn("TensorFlow not available. LSTM model will not function without TensorFlow.")
+    warnings.warn("⚠️ TensorFlow not available. LSTM model will not function without TensorFlow.")
+    logger.info("ℹ️ Install TensorFlow with: pip install tensorflow-cpu")
 
 from .base_model import BaseModel
 
