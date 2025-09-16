@@ -31,7 +31,6 @@ app:
 trading:
   # Supported currency pairs | 支援的貨幣對
   currency_pairs:
-    - "EURUSD=X"
     - "USDJPY=X"
   
   # Trading timeframes | 交易時間框架

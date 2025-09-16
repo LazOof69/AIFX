@@ -48,12 +48,7 @@ class DataLoader:
         
         # Supported symbols mapping | 支持的交易品種映射
         self.symbol_mapping = {
-            'EURUSD': 'EURUSD=X',
-            'USDJPY': 'USDJPY=X',
-            'GBPUSD': 'GBPUSD=X',
-            'USDCHF': 'USDCHF=X',
-            'AUDUSD': 'AUDUSD=X',
-            'USDCAD': 'USDCAD=X'
+            'USDJPY': 'USDJPY=X'
         }
     
     def download_data(

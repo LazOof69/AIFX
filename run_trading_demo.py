@@ -270,7 +270,7 @@ class AIFXTradingDemo:
         try:
             if self.position_manager:
                 await self.position_manager.add_position(
-                    symbol="EUR/USD",
+                    symbol="USD/JPY",
                     side="BUY", 
                     size=0.1,
                     entry_price=1.0500
@@ -355,14 +355,14 @@ class AIFXTradingDemo:
         # 模擬交易執行決策
         import random
         if random.random() > 0.7:  # 30% chance of trade signal
-            symbol = random.choice(["EUR/USD", "USD/JPY"])
+            symbol = "USD/JPY"
             side = random.choice(["BUY", "SELL"])
             self.logger.info(f"📊 Demo signal generated: {side} {symbol}")
             
             # Simulate paper trade execution
             # 模擬紙上交易執行
             if self.position_manager:
-                price = 1.0500 if symbol == "EUR/USD" else 150.50
+                price = 150.50  # USD/JPY price
                 await self.position_manager.add_position(
                     symbol=symbol,
                     side=side,

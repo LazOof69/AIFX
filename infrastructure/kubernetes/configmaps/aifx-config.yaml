@@ -29,7 +29,7 @@ data:
   WORKERS: "4"
   
   # Trading Configuration | 交易配置
-  TRADING_PAIRS: "EURUSD,USDJPY"
+  TRADING_PAIRS: "USDJPY"
   TIMEFRAME: "1H"
   
   # AI Model Configuration | AI模型配置
@@ -66,7 +66,6 @@ data:
     
     trading:
       pairs:
-        - "EURUSD"
         - "USDJPY"
       timeframe: "1H"
       signal_threshold: 0.6

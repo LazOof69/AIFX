@@ -11,11 +11,7 @@ forex_data_sources:
       reconnect_interval: 5
       heartbeat_interval: 30
     symbols:
-      EURUSD: "EURUSD=X"
       USDJPY: "USDJPY=X"
-      GBPUSD: "GBPUSD=X"
-      USDCHF: "USDCHF=X"
-      AUDUSD: "AUDUSD=X"
     
   oanda:
     enabled: false
@@ -25,9 +21,7 @@ forex_data_sources:
       account_id: "YOUR_ACCOUNT_ID"
       access_token: "YOUR_ACCESS_TOKEN"
     instruments:
-      - "EUR_USD"
       - "USD_JPY"
-      - "GBP_USD"
 
 # 數據庫配置
 database:

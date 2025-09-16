@@ -91,7 +91,7 @@ class AIFXTradingSystem:
         self.last_signal_time = None
         
         # System configuration | 系統配置
-        self.trading_symbols = ["CS.D.EURUSD.MINI.IP", "CS.D.USDJPY.MINI.IP"]
+        self.trading_symbols = ["CS.D.USDJPY.MINI.IP"]
         self.update_interval = 60  # seconds
         self.max_daily_trades = 10
         self.daily_trade_count = 0

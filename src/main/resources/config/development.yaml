@@ -3,7 +3,7 @@
 
 # Trading configuration | 交易配置
 trading:
-  symbols: ["EURUSD=X", "USDJPY=X"]
+  symbols: ["USDJPY=X"]
   timeframe: "1h"
   risk_per_trade: 0.01  # 1% risk per trade | 每筆交易1%風險
   max_positions: 1

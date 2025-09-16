@@ -32,11 +32,7 @@ trading:
   
   # Supported instruments | 支援的交易工具
   instruments:
-    - "EUR/USD"
-    - "USD/JPY" 
-    - "GBP/USD"
-    - "USD/CHF"
-    - "AUD/USD"
+    - "USD/JPY"
 
 # Rate Limiting | 速率限制
 rate_limiting:
