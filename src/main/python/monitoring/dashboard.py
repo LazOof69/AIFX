@@ -146,6 +146,10 @@ class TradingDashboard:
         """
         self.update_callbacks.append(callback)
     
+    async def start_monitoring(self) -> None:
+        """Start the dashboard monitoring | 啟動儀表板監控"""
+        return await self.start()
+    
     async def start(self) -> None:
         """Start the dashboard monitoring | 啟動儀表板監控"""
         if self.is_running:
@@ -300,7 +304,10 @@ class TradingDashboard:
                 })
             
             # Check success rate alert | 檢查成功率警報
-            if self.metrics.success_rate < self.alert_thresholds['min_success_rate'] * 100:
+            # Only alert on low success rate if we have actual trading history
+            # 只有在有實際交易歷史時才對低成功率發出警報
+            if (self.metrics.daily_trades > 5 and
+                self.metrics.success_rate < self.alert_thresholds['min_success_rate'] * 100):
                 new_alerts.append({
                     'type': 'low_success_rate',
                     'severity': 'warning',
