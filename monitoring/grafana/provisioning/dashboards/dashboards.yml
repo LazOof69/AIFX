@@ -1,0 +1,13 @@
+# Grafana Dashboards Provisioning for AIFX 24/7 Trading System
+# AIFX 24/7 交易系統的 Grafana 儀表板配置
+
+apiVersion: 1
+
+providers:
+  - name: AIFX Trading Dashboards
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards

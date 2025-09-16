@@ -1,0 +1,401 @@
+# AIFX 24/7 USD/JPY Trading System - Production Deployment
+# AIFX 24/7 美元/日圓交易系統 - 生產部署
+#
+# This configuration provides a complete 24/7 trading environment specifically
+# optimized for USD/JPY trading with professional monitoring, backup, and recovery.
+#
+# Usage: docker-compose -f docker-compose-24x7-usdjpy.yml up -d
+# 使用方法：docker-compose -f docker-compose-24x7-usdjpy.yml up -d
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # MAIN TRADING APPLICATION | 主要交易應用程式
+  # ============================================================================
+  aifx-trading:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+      target: production
+    container_name: aifx-trading-24x7
+    ports:
+      - "8000:8000"      # Main API port
+      - "8088:8088"      # Trading Dashboard
+      - "8089:8089"      # Health check port
+    environment:
+      # Python Environment | Python環境
+      - PYTHONPATH=/home/aifx/app/src/main/python
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONOPTIMIZE=1
+
+      # AIFX Configuration | AIFX配置
+      - AIFX_ENV=production
+      - AIFX_ROOT=/home/aifx/app
+      - AIFX_DATA_DIR=/home/aifx/app/data
+      - AIFX_MODELS_DIR=/home/aifx/app/models
+      - AIFX_OUTPUT_DIR=/home/aifx/app/output
+      - AIFX_LOGS_DIR=/home/aifx/app/logs
+
+      # TensorFlow Configuration | TensorFlow配置
+      - TF_CPP_MIN_LOG_LEVEL=2
+      - TF_ENABLE_ONEDNN_OPTS=0
+
+      # Trading Configuration | 交易配置
+      - TRADING_MODE=live              # LIVE TRADING MODE!
+      - TRADING_SYMBOLS=USD/JPY        # USD/JPY ONLY as requested
+      - ENABLE_24X7=true
+      - AUTO_RESTART_ON_ERROR=true
+      - ENABLE_TRADING=true
+
+      # Database Configuration | 資料庫配置
+      - POSTGRES_HOST=postgres-db
+      - POSTGRES_DB=aifx_trading_24x7
+      - POSTGRES_USER=aifx
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+
+      # Redis Configuration | Redis配置
+      - REDIS_HOST=redis-cache
+      - REDIS_PORT=6379
+
+      # IG Markets API (LIVE) - YOU MUST PROVIDE REAL CREDENTIALS
+      # IG Markets API（實盤）- 您必須提供真實憑證
+      - IG_LIVE_API_KEY_FILE=/run/secrets/ig_api_key
+      - IG_LIVE_USERNAME_FILE=/run/secrets/ig_username
+      - IG_LIVE_PASSWORD_FILE=/run/secrets/ig_password
+      - IG_LIVE_ACCOUNT_ID_FILE=/run/secrets/ig_account_id
+      - IG_API_BASE_URL=https://api.ig.com/gateway/deal  # LIVE API URL
+
+      # Monitoring & Alerts | 監控與警報
+      - ENABLE_MONITORING=true
+      - ENABLE_ALERTS=true
+      - ALERT_EMAIL_FILE=/run/secrets/alert_email
+      - ALERT_WEBHOOK_FILE=/run/secrets/alert_webhook
+
+      # Performance Tuning | 性能調優
+      - MALLOC_TRIM_THRESHOLD_=100000
+      - MALLOC_TOP_PAD_=100000
+
+    volumes:
+      # Persistent Data Volumes | 持久化數據卷
+      - trading_data:/home/aifx/app/data
+      - trading_models:/home/aifx/app/models
+      - trading_output:/home/aifx/app/output
+      - trading_logs:/home/aifx/app/logs
+      - trading_backups:/home/aifx/app/backups
+
+      # Configuration Volumes | 配置卷
+      - ./src:/home/aifx/app/src:ro
+      - ./config:/home/aifx/app/config:ro
+
+    secrets:
+      # Secure credential management | 安全憑證管理
+      - db_password
+      - ig_api_key
+      - ig_username
+      - ig_password
+      - ig_account_id
+      - alert_email
+      - alert_webhook
+
+    restart: unless-stopped
+
+    # 24/7 Trading Command | 24/7交易命令
+    command: ["python", "run_trading_demo.py", "--mode", "live"]
+
+    # Advanced Health Check | 高級健康檢查
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8088/health').raise_for_status()"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+
+    networks:
+      - aifx-network
+
+  # ============================================================================
+  # DATABASE - POSTGRESQL | 資料庫 - POSTGRESQL
+  # ============================================================================
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: aifx-postgres-24x7
+    environment:
+      POSTGRES_DB: aifx_trading_24x7
+      POSTGRES_USER: aifx
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    volumes:
+      # Persistent database storage | 持久化資料庫存儲
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_backups:/var/lib/postgresql/backups
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+
+    ports:
+      - "5432:5432"
+
+    secrets:
+      - db_password
+
+    restart: unless-stopped
+
+    # Database health check | 資料庫健康檢查
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aifx -d aifx_trading_24x7"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+    networks:
+      - aifx-network
+
+    # Automated backup configuration | 自動備份配置
+    labels:
+      - "backup.enable=true"
+      - "backup.schedule=0 2 * * *"  # Daily at 2 AM
+
+  # ============================================================================
+  # REDIS CACHE | REDIS 緩存
+  # ============================================================================
+  redis-cache:
+    image: redis:7-alpine
+    container_name: aifx-redis-24x7
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - redis_data:/data
+      - redis_backups:/backups
+
+    restart: unless-stopped
+
+    # Redis health check | Redis健康檢查
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - aifx-network
+
+  # ============================================================================
+  # MONITORING - GRAFANA DASHBOARD | 監控 - GRAFANA儀表板
+  # ============================================================================
+  grafana-monitor:
+    image: grafana/grafana:latest
+    container_name: aifx-grafana-24x7
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_password
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_LOG_LEVEL=warn
+
+    ports:
+      - "3000:3000"      # Grafana Web UI
+
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - grafana_dashboards:/etc/grafana/dashboards
+      - ./monitoring/grafana:/etc/grafana/provisioning:ro
+
+    secrets:
+      - grafana_password
+
+    restart: unless-stopped
+
+    depends_on:
+      - aifx-trading
+
+    networks:
+      - aifx-network
+
+  # ============================================================================
+  # BACKUP SERVICE | 備份服務
+  # ============================================================================
+  backup-service:
+    image: postgres:15-alpine
+    container_name: aifx-backup-24x7
+    environment:
+      - POSTGRES_HOST=postgres-db
+      - POSTGRES_DB=aifx_trading_24x7
+      - POSTGRES_USER=aifx
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+      - BACKUP_SCHEDULE=0 2,8,14,20 * * *  # Every 6 hours
+      - BACKUP_RETENTION_DAYS=30
+
+    volumes:
+      - postgres_backups:/backups
+      - trading_backups:/app_backups
+      - ./scripts/backup.sh:/usr/local/bin/backup.sh:ro
+
+    secrets:
+      - db_password
+
+    restart: unless-stopped
+
+    # Backup cron job | 備份定時任務
+    command: >
+      sh -c "
+        apk add --no-cache dcron &&
+        echo '0 2,8,14,20 * * * /usr/local/bin/backup.sh' | crontab - &&
+        crond -f
+      "
+
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+
+    networks:
+      - aifx-network
+
+  # ============================================================================
+  # LOG AGGREGATION | 日誌聚合
+  # ============================================================================
+  log-aggregator:
+    image: fluent/fluent-bit:latest
+    container_name: aifx-logs-24x7
+    volumes:
+      - trading_logs:/var/log/aifx:ro
+      - ./logging/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+
+    ports:
+      - "24224:24224"    # Fluentd forward protocol
+
+    restart: unless-stopped
+
+    networks:
+      - aifx-network
+
+# ============================================================================
+# NETWORKS CONFIGURATION | 網路配置
+# ============================================================================
+networks:
+  aifx-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+    labels:
+      - "project=aifx-24x7"
+
+# ============================================================================
+# PERSISTENT VOLUMES | 持久化卷
+# ============================================================================
+volumes:
+  # Database volumes | 資料庫卷
+  postgres_data:
+    driver: local
+    labels:
+      - "backup=daily"
+
+  postgres_backups:
+    driver: local
+
+  # Redis volumes | Redis卷
+  redis_data:
+    driver: local
+
+  redis_backups:
+    driver: local
+
+  # Application volumes | 應用程式卷
+  trading_data:
+    driver: local
+    labels:
+      - "backup=daily"
+
+  trading_models:
+    driver: local
+    labels:
+      - "backup=weekly"
+
+  trading_output:
+    driver: local
+    labels:
+      - "backup=daily"
+
+  trading_logs:
+    driver: local
+
+  trading_backups:
+    driver: local
+
+  # Monitoring volumes | 監控卷
+  grafana_data:
+    driver: local
+
+  grafana_dashboards:
+    driver: local
+
+# ============================================================================
+# SECURE SECRETS MANAGEMENT | 安全憑證管理
+# ============================================================================
+secrets:
+  # Database credentials | 資料庫憑證
+  db_password:
+    file: ./secrets/db_password.txt
+
+  # IG Markets API credentials | IG Markets API憑證
+  ig_api_key:
+    file: ./secrets/ig_api_key.txt
+
+  ig_username:
+    file: ./secrets/ig_username.txt
+
+  ig_password:
+    file: ./secrets/ig_password.txt
+
+  ig_account_id:
+    file: ./secrets/ig_account_id.txt
+
+  # Monitoring credentials | 監控憑證
+  grafana_password:
+    file: ./secrets/grafana_password.txt
+
+  # Alert configuration | 警報配置
+  alert_email:
+    file: ./secrets/alert_email.txt
+
+  alert_webhook:
+    file: ./secrets/alert_webhook.txt
+
+# ============================================================================
+# LABELS AND METADATA | 標籤和元數據
+# ============================================================================
+x-labels: &default-labels
+  project: "aifx-24x7-usdjpy"
+  version: "1.0.0"
+  environment: "production"
+  maintainer: "AIFX Development Team"
+  description: "24/7 USD/JPY Trading System"
+  backup: "enabled"
+  monitoring: "enabled"
+
+# Apply labels to all services | 將標籤應用於所有服務
+x-common-config:
+  labels: *default-labels
