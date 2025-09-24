@@ -414,3 +414,7 @@ class SignalAggregator:
             'avg_strength': np.mean([s.strength for s in self.signals]),
             'avg_confidence': np.mean([s.confidence for s in self.signals])
         }
+
+
+# Backward compatibility aliases | 向後兼容別名
+SignalCombiner = BaseSignalCombiner  # Main signal combiner class alias

@@ -550,3 +550,7 @@ F1-Score: {metrics.get('f1_score', 0):.3f}"""
             })
         
         return results
+
+
+# Backward compatibility aliases | 向後兼容別名
+PerformanceMetrics = TradingPerformanceMetrics  # Main performance metrics class alias

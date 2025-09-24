@@ -975,3 +975,7 @@ def create_risk_manager_preset(risk_level: RiskLevel, account_balance: float = 1
         params = RiskParameters()
     
     return AdvancedRiskManager(params, account_balance)
+
+
+# Backward compatibility aliases | 向後兼容別名
+RiskManager = AdvancedRiskManager  # Main risk manager class alias

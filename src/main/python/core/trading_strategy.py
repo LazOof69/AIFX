@@ -848,3 +848,7 @@ class AIFXTradingStrategy(BaseStrategy):
         # This would be implemented with actual start time tracking
         # For now, return a placeholder | 現在返回佔位符
         return "N/A"
+
+
+# Backward compatibility aliases | 向後兼容別名
+TradingStrategy = AIFXTradingStrategy  # Main trading strategy class alias

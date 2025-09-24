@@ -273,11 +273,14 @@ def get_config(environment: str = "development") -> Config:
         return Config()
 
 
+# Backward compatibility aliases | 向後兼容別名
+Configuration = Config  # Main configuration class alias
+
 if __name__ == "__main__":
     # Example usage | 使用示例
     cfg = get_config("development")
     cfg.create_directories()
-    
+
     print(f"Trading symbols | 交易品種: {cfg.trading.symbols}")
     print(f"Risk per trade | 每筆交易風險: {cfg.trading.risk_per_trade}")
     print(f"Data source | 數據源: {cfg.data.data_source}")
