@@ -28,53 +28,22 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user for security
 RUN groupadd -r aifx && useradd -r -g aifx aifx
 
-# Create and copy simplified requirements file
-COPY << 'EOF' requirements-web.txt
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-websockets==12.0
-jinja2==3.1.2
-python-multipart==0.0.6
-pandas==2.1.3
-numpy==1.25.2
-scikit-learn==1.3.2
-xgboost==2.0.2
-yfinance==0.2.28
-python-dateutil==2.8.2
-pytz==2023.3
-aiofiles==23.2.1
-psutil==5.9.6
-EOF
+# Copy simplified requirements file
+COPY requirements-web.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-web.txt
 
-# Copy only necessary application code
-COPY src/main/python/web_interface.py src/main/python/
-COPY src/main/python/services/lightweight_signal_service.py src/main/python/services/
-COPY src/main/python/core/signal_detector.py src/main/python/core/
-COPY src/main/python/utils/ src/main/python/utils/
-COPY src/main/python/models/ src/main/python/models/
-COPY src/main/python/core/__init__.py src/main/python/core/
-COPY src/main/python/services/__init__.py src/main/python/services/
-COPY src/main/python/__init__.py src/main/python/
-COPY src/main/resources/ src/main/resources/
+# Copy application source code
+COPY src/ src/
 
-# Copy essential configuration files
-COPY CLAUDE.md .
+# Copy essential configuration files (optional)
+# COPY CLAUDE.md . (removed - not required for web interface)
 
 # Create necessary directories with proper permissions
-RUN mkdir -p logs data/cache output src/main/python/core src/main/python/services && \
+RUN mkdir -p logs data/cache output && \
     chown -R aifx:aifx /app
-
-# Create empty __init__.py files if they don't exist
-RUN touch src/__init__.py && \
-    touch src/main/__init__.py && \
-    touch src/main/python/core/__init__.py && \
-    touch src/main/python/services/__init__.py && \
-    touch src/main/python/utils/__init__.py && \
-    touch src/main/python/models/__init__.py
 
 # Fix permissions
 RUN chown -R aifx:aifx /app
