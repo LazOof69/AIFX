@@ -1,0 +1,53 @@
+# AIFX Simple Trading System - Docker Deployment
+# AIFX 簡化交易系統 - Docker 部署
+
+services:
+  aifx-simple:
+    image: python:3.12-slim
+    ports:
+      - "8888:8888"  # Simple web interface
+    environment:
+      - PYTHONPATH=/app/src/main/python
+      - PYTHONUNBUFFERED=1
+      - TRADING_MODE=demo
+      - IG_DEMO_API_KEY=3a0f12d07fe51ab5f4f1835ae037e1f5e876726e
+      - IG_DEMO_CST=6776bcc2291f5ab7ef16ae0dad8331daf1912326e82ccdcbb44637774ff1e6CC01116  
+      - IG_DEMO_X_SECURITY_TOKEN=293fa0505aae6745b6a7f38d21b5b63fd2d79d28dc371027f13da690c38359CD01114
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: >
+      bash -c "
+        echo '🚀 Installing dependencies...' &&
+        pip install -q pandas numpy yfinance scikit-learn requests pyyaml matplotlib plotly &&
+        echo '✅ Dependencies installed' &&
+        echo '🎯 Starting AIFX Trading Demo...' &&
+        python run_trading_demo.py --mode demo
+      "
+    restart: unless-stopped
+
+  # Optional: Database for data storage
+  postgres-simple:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: aifx
+      POSTGRES_USER: aifx
+      POSTGRES_PASSWORD: aifx123
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_simple:/var/lib/postgresql/data
+
+  # Optional: Monitoring dashboard
+  grafana-simple:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=aifx123
+    volumes:
+      - grafana_simple:/var/lib/grafana
+
+volumes:
+  postgres_simple:
+  grafana_simple:

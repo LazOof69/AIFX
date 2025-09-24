@@ -18,11 +18,21 @@ AIFX系統的AI模型組件：
 from .base_model import BaseModel, ModelRegistry
 from .xgboost_model import XGBoostModel
 from .random_forest_model import RandomForestModel
-from .lstm_model import LSTMModel
+
+# Conditional LSTM import (TensorFlow optional) | 條件性LSTM導入（TensorFlow可選）
+try:
+    from .lstm_model import LSTMModel
+    LSTM_AVAILABLE = True
+except ImportError:
+    # Create dummy LSTM class if TensorFlow not available | 如果TensorFlow不可用則創建虛擬LSTM類
+    class LSTMModel:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("TensorFlow not available. Install with: pip install tensorflow-cpu")
+    LSTM_AVAILABLE = False
 
 __all__ = [
     'BaseModel',
-    'ModelRegistry', 
+    'ModelRegistry',
     'XGBoostModel',
     'RandomForestModel',
     'LSTMModel'

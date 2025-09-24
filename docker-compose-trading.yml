@@ -1,0 +1,86 @@
+# AIFX Trading System - Docker Deployment
+# AIFX 交易系統 - Docker 部署
+
+services:
+  aifx-trading:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+      target: production
+    ports:
+      - "8000:8000"
+      - "8088:8088"  # Dashboard port
+    environment:
+      - PYTHONPATH=/home/aifx/app/src/main/python
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - AIFX_ENV=production
+      - AIFX_ROOT=/home/aifx/app
+      - AIFX_DATA_DIR=/home/aifx/app/data
+      - AIFX_MODELS_DIR=/home/aifx/app/models
+      - AIFX_OUTPUT_DIR=/home/aifx/app/output
+      - AIFX_LOGS_DIR=/home/aifx/app/logs
+      - TF_CPP_MIN_LOG_LEVEL=2
+      - SKIP_NETWORK_TESTS=false  # Enable network tests for trading
+      - TRADING_MODE=demo
+      - IG_DEMO_API_KEY=3a0f12d07fe51ab5f4f1835ae037e1f5e876726e
+      - IG_DEMO_CST=6776bcc2291f5ab7ef16ae0dad8331daf1912326e82ccdcbb44637774ff1e6CC01116
+      - IG_DEMO_X_SECURITY_TOKEN=293fa0505aae6745b6a7f38d21b5b63fd2d79d28dc371027f13da690c38359CD01114
+    volumes:
+      - ./data:/home/aifx/app/data
+      - ./logs:/home/aifx/app/logs
+      - ./models:/home/aifx/app/models
+      - ./output:/home/aifx/app/output
+      - ./config:/home/aifx/app/config
+      - ./src:/home/aifx/app/src  # Mount source code for development
+    restart: unless-stopped
+    command: ["python", "run_trading_demo.py", "--mode", "demo"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Database for storing trading history
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: aifx_trading
+      POSTGRES_USER: aifx
+      POSTGRES_PASSWORD: aifx_secure_2024
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Optional: Redis for caching market data
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Optional: Trading dashboard monitoring
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=aifx_admin_2024
+      - GF_SECURITY_ADMIN_USER=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    depends_on:
+      - aifx-trading
+
+volumes:
+  postgres_data:
+  redis_data:
+  grafana_data:

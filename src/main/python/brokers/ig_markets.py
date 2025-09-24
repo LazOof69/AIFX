@@ -294,22 +294,37 @@ class IGMarketsConnector:
     支持 REST API 和 Web API OAuth 認證。
     """
     
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str = None):
         """
-        Initialize IG Markets connector
+        Initialize IG Markets connector with optional config path
+        如果未提供配置路徑，將自動使用默認的 IG 演示憑據
+
+        Args:
+            config_path: Optional path to config file, defaults to ig_demo_credentials.json
         初始化 IG Markets 連接器
         
         Args:
             config_path: Path to trading configuration file | 交易配置文件路徑
         """
-        self.config_path = config_path
+        # Set default config path if none provided
+        if config_path is None:
+            import os
+            self.config_path = os.path.join(os.getcwd(), 'ig_demo_credentials.json')
+        else:
+            self.config_path = config_path
         self.config = self._load_config()
+
+        # Load API reference for REST endpoints
+        self.api_reference = self._load_api_reference()
         self.ig_service = None
         self.web_api_connector = None
         self.status = IGConnectionStatus.DISCONNECTED
         self.account_info: Optional[IGAccount] = None
         self.positions: Dict[str, IGPosition] = {}
         self.auth_method = None  # 'rest' or 'oauth'
+
+        # Token Manager for OAuth handling | OAuth 處理的令牌管理器
+        self.token_manager = None  # Will be initialized in connect()
         
         # Rate limiting | 速率限制
         self.last_request_time = 0
@@ -322,51 +337,80 @@ class IGMarketsConnector:
         """Load trading configuration | 載入交易配置"""
         try:
             with open(self.config_path, 'r', encoding='utf-8') as f:
-                config = yaml.safe_load(f)
-            
+                # Check if file is JSON or YAML
+                if self.config_path.endswith('.json'):
+                    config = json.load(f)
+                else:
+                    config = yaml.safe_load(f)
+
             # Validate configuration | 驗證配置
             if 'ig_markets' not in config:
                 raise ValueError("IG Markets configuration not found | 未找到 IG Markets 配置")
-                
+
             return config
-            
+
         except Exception as e:
             logger.error(f"Failed to load configuration: {e}")
             raise
+
+    def _load_api_reference(self) -> Dict[str, Any]:
+        """Load IG Markets API reference | 載入 IG Markets API 參考"""
+        try:
+            import os
+            api_ref_path = os.path.join(os.getcwd(), 'ig_markets_api_reference.json')
+            if os.path.exists(api_ref_path):
+                with open(api_ref_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                logger.warning("API reference file not found, using default endpoints")
+                return {}
+        except Exception as e:
+            logger.warning(f"Failed to load API reference: {e}")
+            return {}
 
     async def connect(self, demo: bool = True, force_oauth: bool = False) -> bool:
         """
         Connect to IG Markets API (Auto-detect authentication method)
         連接到 IG Markets API（自動檢測認證方法）
-        
+
         Args:
             demo: Use demo account if True | 如果為 True 則使用模擬帳戶
             force_oauth: Force OAuth flow for Web API keys | 強制為 Web API 密鑰使用 OAuth 流程
-            
+
         Returns:
             bool: Connection success status | 連接成功狀態
         """
         try:
             self.status = IGConnectionStatus.CONNECTING
-            
+
+            # Initialize token manager with correct demo setting | 使用正確的演示設置初始化令牌管理器
+            from .token_manager import IGTokenManager
+            self.token_manager = IGTokenManager(self.config_path, demo=demo)
+
             # Get configuration | 獲取配置
             account_type = 'demo' if demo else 'live'
             ig_config = self.config['ig_markets'][account_type]
-            
+
             if not ig_config['enabled']:
                 raise ValueError(f"IG {account_type} account is disabled | IG {account_type} 帳戶已禁用")
-            
+
             # Try REST API first (unless forced OAuth) | 首先嘗試 REST API（除非強制 OAuth）
             if not force_oauth:
                 logger.info("Attempting REST API authentication | 嘗試 REST API 認證...")
                 if await self._try_rest_authentication(demo):
                     self.auth_method = 'rest'
                     return True
-            
+
             # If REST API fails, try OAuth Web API | 如果 REST API 失敗，嘗試 OAuth Web API
             logger.info("Attempting Web API OAuth authentication | 嘗試 Web API OAuth 認證...")
-            return await self._try_oauth_authentication(demo)
-                
+            success = await self._try_oauth_authentication(demo)
+
+            if success:
+                # Start automatic token refresh | 啟動自動令牌刷新
+                await self.token_manager.start_auto_refresh()
+
+            return success
+
         except Exception as e:
             self.status = IGConnectionStatus.ERROR
             logger.error(f"Connection failed: {e}")
@@ -406,9 +450,31 @@ class IGMarketsConnector:
     async def _try_oauth_authentication(self, demo: bool) -> bool:
         """Try Web API OAuth authentication | 嘗試 Web API OAuth 認證"""
         try:
-            # Initialize Web API connector | 初始化 Web API 連接器
+            account_type = 'demo' if demo else 'live'
+            ig_config = self.config['ig_markets'][account_type]
+
+            # Check if OAuth token exists in config | 檢查配置中是否存在 OAuth 令牌
+            if 'oauthToken' in ig_config and ig_config['oauthToken'].get('access_token'):
+                logger.info("Found existing OAuth token, attempting direct authentication | 發現現有 OAuth 令牌，嘗試直接認證")
+
+                # Initialize token manager with existing tokens | 使用現有令牌初始化令牌管理器
+                oauth_token = ig_config['oauthToken']
+                if self.token_manager.initialize_tokens(oauth_token):
+                    logger.info("Token manager initialized with existing tokens | 令牌管理器使用現有令牌初始化")
+
+                    # Test the token with a simple API call | 使用簡單的 API 調用測試令牌
+                    if await self._test_oauth_connection():
+                        self.status = IGConnectionStatus.AUTHENTICATED
+                        self.auth_method = 'oauth'
+                        logger.info("Successfully authenticated with existing OAuth token | 使用現有 OAuth 令牌成功認證")
+                        return True
+                    else:
+                        logger.warning("OAuth token test failed, may need refresh | OAuth 令牌測試失敗，可能需要刷新")
+
+            # If no token exists, initialize Web API connector for new OAuth flow
+            # 如果沒有令牌，初始化 Web API 連接器進行新的 OAuth 流程
             self.web_api_connector = IGWebAPIConnector(self.config_path)
-            
+
             # Get OAuth URL | 獲取 OAuth URL
             oauth_url = await self.web_api_connector.get_oauth_url(demo)
             
@@ -440,6 +506,328 @@ class IGMarketsConnector:
         except Exception as e:
             logger.error(f"OAuth authentication error: {e}")
             return False
+
+    async def _authenticate_with_oauth_token(self, oauth_token: Dict[str, Any], demo: bool) -> bool:
+        """
+        Authenticate using existing OAuth token
+        使用現有 OAuth 令牌進行認證
+
+        Args:
+            oauth_token: OAuth token dictionary with access_token, etc.
+            demo: Whether this is a demo account
+
+        Returns:
+            bool: Authentication success
+        """
+        try:
+            # Create session with OAuth Bearer token
+            # 使用 OAuth Bearer 令牌創建會話
+            self.session = requests.Session()
+            self.session.headers.update({
+                'Authorization': f"Bearer {oauth_token['access_token']}",
+                'Content-Type': 'application/json; charset=UTF-8',
+                'Accept': 'application/json',
+                'X-IG-API-KEY': 'API_KEY_HERE'  # Not needed for OAuth but kept for compatibility
+            })
+
+            # Test the connection by getting account info
+            # 通過獲取賬戶信息測試連接
+            account_type = 'demo' if demo else 'live'
+            ig_config = self.config['ig_markets'][account_type]
+
+            base_url = "https://demo-api.ig.com" if demo else "https://api.ig.com"
+            test_url = f"{base_url}/gateway/deal/session"
+
+            # Make test request to validate token
+            # 進行測試請求以驗證令牌
+            response = self.session.get(test_url)
+
+            if response.status_code == 200:
+                # Store account info from config
+                # 從配置中存儲帳戶信息
+                self.account_info = IGAccount(
+                    account_id=ig_config['accountId'],
+                    account_name="IG Demo Account",
+                    balance=10000.0,  # Default demo balance
+                    available=10000.0,
+                    margin=0.0,
+                    pnl=0.0,
+                    currency="USD"
+                )
+
+                logger.info(f"OAuth authentication successful for account {ig_config['accountId']}")
+                return True
+            else:
+                logger.warning(f"OAuth token validation failed: {response.status_code} - {response.text}")
+                return False
+
+        except Exception as e:
+            logger.error(f"OAuth token authentication error: {e}")
+            return False
+
+    async def _test_oauth_connection(self) -> bool:
+        """
+        Test OAuth connection with a simple API call | 使用簡單的 API 調用測試 OAuth 連接
+
+        Returns:
+            bool: Connection test success
+        """
+        try:
+            # Use token manager to get valid headers | 使用令牌管理器獲取有效標頭
+            headers = self.token_manager.get_auth_headers()
+
+            # Test with a simple accounts endpoint | 使用簡單的帳戶端點測試
+            account_type = 'demo' if 'demo' in str(self.config_path).lower() else 'live'
+            base_url = "https://demo-api.ig.com" if account_type == 'demo' else "https://api.ig.com"
+            test_url = f"{base_url}/gateway/deal/accounts"
+
+            headers['Version'] = '1'  # Add version header
+
+            response = self.session.get(test_url, headers=headers, timeout=30)
+
+            if response.status_code == 200:
+                logger.info("OAuth connection test successful | OAuth 連接測試成功")
+                return True
+            else:
+                logger.warning(f"OAuth connection test failed: HTTP {response.status_code}")
+                return False
+
+        except Exception as e:
+            logger.error(f"OAuth connection test error: {e}")
+            return False
+
+    # ====================================================================================
+    # REST API METHODS USING IG MARKETS API REFERENCE | 使用 IG MARKETS API 參考的 REST API 方法
+    # ====================================================================================
+
+    async def get_accounts(self) -> Dict[str, Any]:
+        """
+        Get account list using REST API | 使用 REST API 獲取帳戶列表
+        Reference: /accounts (GET, v1)
+        """
+        return await self._make_rest_request('account', 'get_accounts')
+
+    async def get_positions(self) -> Dict[str, Any]:
+        """
+        Get all open positions using REST API | 使用 REST API 獲取所有開倉頭寸
+        Reference: /positions (GET, v2)
+        """
+        return await self._make_rest_request('dealing', 'get_positions')
+
+    async def get_position_by_deal_id(self, deal_id: str) -> Dict[str, Any]:
+        """
+        Get specific position by deal ID using REST API | 使用 REST API 通過交易ID獲取特定頭寸
+        Reference: /positions/{dealId} (GET, v2)
+        """
+        return await self._make_rest_request('dealing', 'get_position_by_deal_id', path_params={'dealId': deal_id})
+
+    async def create_position(self, position_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create new position using REST API | 使用 REST API 創建新頭寸
+        Reference: /positions/otc (POST, v2)
+        """
+        return await self._make_rest_request('dealing', 'create_position', json_data=position_data)
+
+    async def close_position(self, close_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Close position using REST API | 使用 REST API 關閉頭寸
+        Reference: /positions/otc (DELETE, v1)
+        """
+        return await self._make_rest_request('dealing', 'close_positions', json_data=close_data)
+
+    async def update_position(self, deal_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update existing position using REST API | 使用 REST API 更新現有頭寸
+        Reference: /positions/otc/{dealId} (PUT, v2)
+        """
+        return await self._make_rest_request('dealing', 'update_position', path_params={'dealId': deal_id}, json_data=update_data)
+
+    async def get_working_orders(self) -> Dict[str, Any]:
+        """
+        Get all working orders using REST API | 使用 REST API 獲取所有工作訂單
+        Reference: /working-orders (GET, v2)
+        """
+        return await self._make_rest_request('dealing', 'get_working_orders')
+
+    async def create_working_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create working order using REST API | 使用 REST API 創建工作訂單
+        Reference: /working-orders/otc (POST, v2)
+        """
+        return await self._make_rest_request('dealing', 'create_working_order', json_data=order_data)
+
+    async def delete_working_order(self, deal_id: str) -> Dict[str, Any]:
+        """
+        Delete working order using REST API | 使用 REST API 刪除工作訂單
+        Reference: /working-orders/otc/{dealId} (DELETE, v2)
+        """
+        return await self._make_rest_request('dealing', 'delete_working_order', path_params={'dealId': deal_id})
+
+    async def get_market_details(self, epic: str) -> Dict[str, Any]:
+        """
+        Get market details using REST API | 使用 REST API 獲取市場詳細信息
+        Reference: /markets/{epic} (GET, v4)
+        """
+        return await self._make_rest_request('markets', 'get_market_details', path_params={'epic': epic})
+
+    async def get_historical_prices(self, epic: str, resolution: str = 'HOUR', num_points: int = 50) -> Dict[str, Any]:
+        """
+        Get historical prices using REST API | 使用 REST API 獲取歷史價格
+        Reference: /prices/{epic}/{resolution}/{numPoints} (GET, v2)
+        """
+        path_params = {
+            'epic': epic,
+            'resolution': resolution,
+            'numPoints': num_points
+        }
+        return await self._make_rest_request('markets', 'get_historical_prices_points', path_params=path_params)
+
+    async def search_markets(self, search_term: str) -> Dict[str, Any]:
+        """
+        Search markets using REST API | 使用 REST API 搜索市場
+        Reference: /markets?searchTerm={searchTerm} (GET, v1)
+        """
+        return await self._make_rest_request('markets', 'search_markets', query_params={'searchTerm': search_term})
+
+    async def _make_rest_request(
+        self,
+        category: str,
+        endpoint_key: str,
+        path_params: Dict[str, Any] = None,
+        query_params: Dict[str, Any] = None,
+        json_data: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Generic REST API request method using API reference | 使用API參考的通用REST API請求方法
+        """
+        try:
+            if not self.api_reference or 'ig_markets_rest_api' not in self.api_reference:
+                raise Exception("API reference not loaded")
+
+            api_ref = self.api_reference['ig_markets_rest_api']
+
+            # Get endpoint configuration
+            if category not in api_ref['endpoints']:
+                raise Exception(f"API category '{category}' not found")
+
+            if endpoint_key not in api_ref['endpoints'][category]:
+                raise Exception(f"Endpoint '{endpoint_key}' not found in category '{category}'")
+
+            endpoint_config = api_ref['endpoints'][category][endpoint_key]
+
+            # Build URL
+            account_type = 'demo' if 'demo' in str(self.config_path).lower() else 'live'
+            base_url = api_ref['base_urls'][account_type]
+            path = endpoint_config['path']
+
+            # Replace path parameters
+            if path_params:
+                for key, value in path_params.items():
+                    path = path.replace(f'{{{key}}}', str(value))
+
+            url = f"{base_url}{path}"
+
+            # Add query parameters
+            if query_params:
+                from urllib.parse import urlencode
+                url += f"?{urlencode(query_params)}"
+
+            # Build base headers
+            headers = {
+                'Content-Type': f"application/json; charset=UTF-8",
+                'Accept': 'application/json; charset=UTF-8',
+                'Version': str(endpoint_config['version'])
+            }
+
+            # Add authentication headers using token manager | 使用令牌管理器添加認證標頭
+            if self.auth_method == 'oauth' and self.token_manager:
+                try:
+                    auth_headers = self.token_manager.get_auth_headers(include_account_id=True)
+                    headers.update(auth_headers)
+                    # Override Content-Type and Accept if they were overwritten
+                    headers['Content-Type'] = f"application/json; charset=UTF-8"
+                    headers['Accept'] = 'application/json; charset=UTF-8'
+                    headers['Version'] = str(endpoint_config['version'])
+                except Exception as e:
+                    logger.error(f"Failed to get authentication headers: {e}")
+                    raise Exception("Authentication failed - no valid token")
+
+            elif self.auth_method == 'rest' and hasattr(self, 'ig_service') and self.ig_service:
+                # For REST API authentication, we would use CST and X-SECURITY-TOKEN
+                # This is handled by the trading-ig library automatically
+                pass
+
+            # Make request
+            method = endpoint_config['method'].upper()
+
+            if not hasattr(self, 'session'):
+                import requests
+                self.session = requests.Session()
+
+            if method == 'GET':
+                response = self.session.get(url, headers=headers, timeout=30)
+            elif method == 'POST':
+                response = self.session.post(url, headers=headers, json=json_data, timeout=30)
+            elif method == 'PUT':
+                response = self.session.put(url, headers=headers, json=json_data, timeout=30)
+            elif method == 'DELETE':
+                response = self.session.delete(url, headers=headers, json=json_data, timeout=30)
+            else:
+                raise Exception(f"Unsupported HTTP method: {method}")
+
+            # Handle response
+            if response.status_code in [200, 201, 202, 204]:
+                if response.content:
+                    return response.json()
+                else:
+                    return {'status': 'success'}
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                logger.error(f"REST API request failed: {error_msg}")
+                raise Exception(error_msg)
+
+        except Exception as e:
+            logger.error(f"REST API request failed: {e}")
+            raise
+
+    async def disconnect(self):
+        """
+        Disconnect from IG Markets API and cleanup resources | 斷開與 IG Markets API 的連接並清理資源
+        """
+        try:
+            if self.token_manager:
+                await self.token_manager.stop_auto_refresh()
+                logger.info("Token manager stopped")
+
+            self.status = IGConnectionStatus.DISCONNECTED
+            self.auth_method = None
+            logger.info("Disconnected from IG Markets API")
+
+        except Exception as e:
+            logger.error(f"Error during disconnect: {e}")
+
+    def get_connection_status(self) -> Dict[str, Any]:
+        """
+        Get comprehensive connection status | 獲取全面的連接狀態
+
+        Returns:
+            Dict[str, Any]: Connection status information
+        """
+        status_info = {
+            'status': self.status.value if self.status else 'unknown',
+            'auth_method': self.auth_method,
+            'account_info': {
+                'account_id': self.account_info.account_id if self.account_info else None,
+                'balance': self.account_info.balance if self.account_info else None,
+                'currency': self.account_info.currency if self.account_info else None
+            }
+        }
+
+        # Add token status if OAuth authentication | 如果是 OAuth 認證，添加令牌狀態
+        if self.auth_method == 'oauth' and self.token_manager:
+            status_info['token_status'] = self.token_manager.get_token_status()
+
+        return status_info
 
     async def _update_account_info(self):
         """Update account information | 更新帳戶信息"""
@@ -1535,6 +1923,31 @@ class IGMarketsConnector:
             
         except Exception as e:
             logger.error(f"Error during disconnect: {e}")
+
+
+    def authenticate_with_tokens(self, cst_token, security_token):
+        """Authenticate using existing CST and X-SECURITY-TOKEN"""
+        try:
+            self.session.headers.update({
+                'CST': cst_token,
+                'X-SECURITY-TOKEN': security_token,
+                'X-IG-API-KEY': self.config['api_key']
+            })
+            
+            # Test authentication with account info
+            response = self.session.get(f"{self.config['api_url']}/accounts", 
+                                      headers={'Version': '1'}, timeout=10)
+            
+            if response.status_code == 200:
+                self.authenticated = True
+                self.account_info = response.json()
+                return True
+            else:
+                return False
+                
+        except Exception as e:
+            print(f"Token authentication error: {e}")
+            return False
 
     def get_status(self) -> Dict[str, Any]:
         """
