@@ -1,6 +1,6 @@
 # AIFX Cloud Deployment Configuration
 # AIFX 雲端部署配置
-# Optimized for cloud virtual machines | 針對雲端虛擬機器優化
+# Optimized for Ubuntu servers and cloud virtual machines | 針對 Ubuntu 伺服器和雲端虛擬機器優化
 
 services:
   aifx-trading-system:
