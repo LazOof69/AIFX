@@ -1,0 +1,81 @@
+# AIFX Cloud Deployment Configuration
+# AIFX 雲端部署配置
+# Optimized for cloud virtual machines | 針對雲端虛擬機器優化
+
+services:
+  aifx-trading-system:
+    build:
+      context: ..
+      dockerfile: Dockerfile.web
+    container_name: aifx-trading-cloud
+    ports:
+      - "${AIFX_WEB_PORT:-8080}:8080"
+    environment:
+      # Application Configuration | 應用程式配置
+      - AIFX_ENVIRONMENT=cloud
+      - AIFX_IN_CONTAINER=true
+      - AIFX_WEB_PORT=8080
+      - AIFX_LOG_LEVEL=${AIFX_LOG_LEVEL:-INFO}
+      - AIFX_DEBUG=${AIFX_DEBUG:-false}
+
+      # Trading Configuration | 交易配置
+      - TRADING_ENABLED=${TRADING_ENABLED:-false}
+      - TRADING_MODE=${TRADING_MODE:-demo}
+      - DEFAULT_CURRENCY_PAIRS=EUR/USD,USD/JPY
+      - DEFAULT_TIMEFRAME=1H
+
+      # Security Configuration | 安全配置
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - API_KEY_REQUIRED=${API_KEY_REQUIRED:-false}
+
+      # Performance Configuration | 性能配置
+      - WORKERS=${WORKERS:-2}
+      - MAX_CONNECTIONS=${MAX_CONNECTIONS:-100}
+      - CACHE_TTL=${CACHE_TTL:-300}
+
+    volumes:
+      # Persistent data storage | 持久化資料儲存
+      - aifx_data:/app/data
+      - aifx_logs:/app/logs
+      - aifx_models:/app/models
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+  # Optional: Redis for caching (uncomment if needed)
+  # aifx-redis:
+  #   image: redis:7-alpine
+  #   container_name: aifx-redis
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - aifx_redis:/data
+  #   restart: unless-stopped
+
+volumes:
+  aifx_data:
+    driver: local
+  aifx_logs:
+    driver: local
+  aifx_models:
+    driver: local
+  # aifx_redis:
+  #   driver: local
+
+networks:
+  default:
+    name: aifx-cloud-network
