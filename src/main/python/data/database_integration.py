@@ -70,7 +70,7 @@ class DatabaseMetrics:
     failed_operations: int = 0
 
 
-class DatabaseManager:
+class RealtimeDatabaseManager:
     """Manages database connections and operations for forex data"""
     
     def __init__(self, config: Dict[str, Any]):
@@ -714,6 +714,9 @@ def create_database_integration_manager(config_path: str = "config/data-sources.
     """Create database integration manager"""
     return DatabaseIntegrationManager(config_path)
 
+
+# Backward compatibility alias | 向後相容性別名
+DatabaseManager = RealtimeDatabaseManager
 
 if __name__ == "__main__":
     # Example usage and testing

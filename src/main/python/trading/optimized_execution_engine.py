@@ -37,6 +37,7 @@ import threading
 from collections import deque, defaultdict
 
 from ..utils.logger import get_logger
+from .execution_engine import ExecutionEngine, ExecutionMode as BaseExecutionMode
 
 logger = get_logger(__name__)
 
@@ -115,7 +116,7 @@ class OptimizedOrder:
     average_fill_price: float = 0.0
     execution_metrics: List[ExecutionMetrics] = field(default_factory=list)
 
-class OptimizedExecutionEngine:
+class OptimizedExecutionEngine(ExecutionEngine):
     """
     Optimized Order Execution Engine | 優化訂單執行引擎
 

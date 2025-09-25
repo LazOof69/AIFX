@@ -391,6 +391,123 @@ class AIFXLogger:
         """Log debug message | 記錄調試消息"""
         self.logger.debug(message, extra=kwargs)
 
+    def log_exception(
+        self,
+        exception: Exception,
+        component: str = "unknown",
+        operation: str = "unknown",
+        additional_context: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """
+        Log exceptions with structured context | 使用結構化上下文記錄異常
+
+        Args:
+            exception: The exception to log
+            component: Component where error occurred
+            operation: Operation being performed
+            additional_context: Additional context data
+        """
+        from .exceptions import AIFXBaseException, ErrorSeverity, ErrorCategory
+
+        # Prepare context data
+        context = {
+            "event_type": TradingEventType.ERROR_OCCURRED.value,
+            "component": component,
+            "operation": operation,
+            "session_id": self.session_id
+        }
+
+        if additional_context:
+            context.update(additional_context)
+
+        if isinstance(exception, AIFXBaseException):
+            # Use structured data from AIFX exceptions
+            error_data = exception.to_dict()
+            context.update(error_data)
+            message = f"AIFX Exception in {component}.{operation}: {exception.message}"
+        else:
+            # Handle standard exceptions
+            context.update({
+                "error_type": exception.__class__.__name__,
+                "error_message": str(exception),
+                "severity": ErrorSeverity.MEDIUM.value,
+                "category": ErrorCategory.SYSTEM.value
+            })
+            message = f"Exception in {component}.{operation}: {str(exception)}"
+
+        self.logger.error(message, extra=context, exc_info=True)
+
+    def log_error_with_recovery(
+        self,
+        error_message: str,
+        component: str,
+        operation: str,
+        recovery_action: str,
+        success: bool = True,
+        **kwargs
+    ) -> None:
+        """
+        Log errors with recovery attempts | 記錄帶恢復嘗試的錯誤
+
+        Args:
+            error_message: Description of the error
+            component: Component where error occurred
+            operation: Operation that failed
+            recovery_action: Action taken to recover
+            success: Whether recovery was successful
+            **kwargs: Additional context
+        """
+        context = {
+            "event_type": "ERROR_RECOVERY",
+            "component": component,
+            "operation": operation,
+            "recovery_action": recovery_action,
+            "recovery_success": success,
+            "session_id": self.session_id,
+            **kwargs
+        }
+
+        level = "WARNING" if success else "ERROR"
+        status = "successful" if success else "failed"
+        message = f"Error recovery {status} in {component}.{operation}: {error_message}"
+
+        if success:
+            self.logger.warning(message, extra=context)
+        else:
+            self.logger.error(message, extra=context)
+
+    def log_performance_warning(
+        self,
+        component: str,
+        operation: str,
+        duration: float,
+        threshold: float,
+        **kwargs
+    ) -> None:
+        """
+        Log performance warnings | 記錄性能警告
+
+        Args:
+            component: Component name
+            operation: Operation name
+            duration: Actual duration in seconds
+            threshold: Expected threshold in seconds
+            **kwargs: Additional context
+        """
+        context = {
+            "event_type": "PERFORMANCE_WARNING",
+            "component": component,
+            "operation": operation,
+            "duration": duration,
+            "threshold": threshold,
+            "performance_ratio": duration / threshold,
+            "session_id": self.session_id,
+            **kwargs
+        }
+
+        message = f"Performance warning: {component}.{operation} took {duration:.2f}s (threshold: {threshold:.2f}s)"
+        self.logger.warning(message, extra=context)
+
 
 # Global logger instance | 全局日誌器實例
 logger = None

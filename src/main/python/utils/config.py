@@ -162,6 +162,9 @@ class Config:
         # Load custom configuration if provided | 如果提供則載入自定義配置
         if config_file:
             self.load_config(config_file)
+
+        # Load environment variables | 載入環境變數
+        self.load_environment_variables()
     
     def load_config(self, config_file: str) -> None:
         """
@@ -225,7 +228,77 @@ class Config:
         for field_name in obj.__dataclass_fields__:
             result[field_name] = getattr(obj, field_name)
         return result
-    
+
+    def load_environment_variables(self) -> None:
+        """
+        Load configuration from environment variables | 從環境變數載入配置
+        Environment variables override YAML settings | 環境變數覆蓋YAML設定
+        """
+        # Trading configuration environment variables | 交易配置環境變數
+        env_vars = {
+            # Trading settings | 交易設定
+            'AIFX_RISK_PER_TRADE': ('trading', 'risk_per_trade', float),
+            'AIFX_MAX_POSITIONS': ('trading', 'max_positions', int),
+            'AIFX_MIN_CONFIDENCE': ('trading', 'min_confidence_threshold', float),
+            'AIFX_TIMEFRAME': ('trading', 'timeframe', str),
+            'AIFX_STOP_LOSS_MULTIPLIER': ('trading', 'stop_loss_atr_multiplier', float),
+            'AIFX_TAKE_PROFIT_MULTIPLIER': ('trading', 'take_profit_atr_multiplier', float),
+
+            # Data configuration | 數據配置
+            'AIFX_DATA_LOOKBACK': ('data', 'lookback_days', int),
+            'AIFX_DATA_UPDATE_INTERVAL': ('data', 'update_interval', int),
+
+            # Model configuration | 模型配置
+            'AIFX_XGBOOST_ESTIMATORS': ('model', 'xgboost_params', dict, 'n_estimators'),
+            'AIFX_RF_ESTIMATORS': ('model', 'random_forest_params', dict, 'n_estimators'),
+            'AIFX_LSTM_EPOCHS': ('model', 'lstm_params', dict, 'epochs'),
+
+            # Backtest configuration | 回測配置
+            'AIFX_INITIAL_CASH': ('backtest', 'initial_cash', float),
+            'AIFX_COMMISSION': ('backtest', 'commission', float),
+            'AIFX_SLIPPAGE': ('backtest', 'slippage', float),
+
+            # System settings | 系統設定
+            'AIFX_LOG_LEVEL': ('system', 'log_level', str),
+            'AIFX_ENVIRONMENT': ('system', 'environment', str),
+        }
+
+        for env_var, config_info in env_vars.items():
+            value = os.environ.get(env_var)
+            if value is not None:
+                try:
+                    if len(config_info) == 3:
+                        # Simple attribute | 簡單屬性
+                        section, attr, type_func = config_info
+                        config_obj = getattr(self, section, None)
+                        if config_obj and hasattr(config_obj, attr):
+                            setattr(config_obj, attr, type_func(value))
+                    elif len(config_info) == 4:
+                        # Nested attribute in dict | 字典中的嵌套屬性
+                        section, attr, type_func, nested_key = config_info
+                        config_obj = getattr(self, section, None)
+                        if config_obj and hasattr(config_obj, attr):
+                            config_dict = getattr(config_obj, attr)
+                            if isinstance(config_dict, dict) and nested_key in config_dict:
+                                if type_func == dict:
+                                    config_dict[nested_key] = int(value) if value.isdigit() else float(value)
+                                else:
+                                    config_dict[nested_key] = type_func(value)
+                except (ValueError, AttributeError) as e:
+                    print(f"Warning: Failed to set {env_var}={value}: {e}")
+
+        # Handle system configuration | 處理系統配置
+        if not hasattr(self, 'system'):
+            self.system = type('SystemConfig', (), {})()
+
+        self.system.log_level = os.environ.get('AIFX_LOG_LEVEL', 'INFO')
+        self.system.environment = os.environ.get('AIFX_ENVIRONMENT', 'development')
+        self.system.debug = os.environ.get('AIFX_DEBUG', 'false').lower() == 'true'
+
+        # Docker/Container specific settings | Docker/容器特定設定
+        self.system.in_container = os.environ.get('AIFX_IN_CONTAINER', 'false').lower() == 'true'
+        self.system.web_port = int(os.environ.get('AIFX_WEB_PORT', '8080'))
+
     def create_directories(self) -> None:
         """
         Create necessary directories | 創建必要目錄

@@ -19,12 +19,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import uvicorn
 
-# Import core components
-from core.ai_signal_combiner import AISignalCombiner
-from utils.data_loader import DataLoader
-from utils.feature_generator import FeatureGenerator
-from services.model_manager import ModelManager
-from services.lightweight_signal_service import LightweightSignalService, SignalServiceConfig
+# Import core components - adjusted for Docker container paths
+from src.main.python.core.ai_signal_combiner import AISignalCombiner
+from src.main.python.utils.data_loader import DataLoader
+from src.main.python.utils.feature_generator import FeatureGenerator
+from src.main.python.services.model_manager import ModelLifecycleManager
+from src.main.python.services.lightweight_signal_service import LightweightSignalService, SignalServiceConfig
 
 logger = logging.getLogger(__name__)
 
