@@ -28,6 +28,23 @@ jupyterlab>=4.0.0             # JupyterLab environment | JupyterLab環境
 notebook>=7.0.0               # Jupyter notebook interface | Jupyter筆記本界面
 
 # ============================================================================
+# Testing Framework (merged from requirements-test.txt) | 測試框架（從requirements-test.txt合併）
+# ============================================================================
+pytest>=7.4.0                 # Testing framework | 測試框架
+pytest-cov>=4.1.0             # Coverage plugin for pytest | pytest的覆蓋率插件
+pytest-xdist>=3.3.0           # Distributed testing plugin | 分布式測試插件
+pytest-mock>=3.11.0           # Mock object plugin | 模擬對象插件
+pytest-asyncio>=0.21.0        # Async testing support | 異步測試支持
+pytest-benchmark>=4.0.0       # Performance benchmarking | 性能基準測試
+pytest-html>=4.0.0            # HTML test reports | HTML測試報告
+pytest-json-report>=1.5.0     # JSON test reports | JSON測試報告
+factory-boy>=3.3.0            # Test fixtures replacement | 測試夾具替代品
+responses>=0.23.0             # Mock HTTP requests | 模擬HTTP請求
+freezegun>=1.2.0              # Mock datetime in tests | 在測試中模擬日期時間
+httpx>=0.25.0                 # HTTP client for testing APIs | 用於測試API的HTTP客戶端
+hypothesis>=6.87.0            # Property-based testing | 基於屬性的測試
+
+# ============================================================================
 # Documentation | 文檔
 # ============================================================================
 sphinx>=7.0.0                 # Documentation generator | 文檔生成器

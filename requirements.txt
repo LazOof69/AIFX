@@ -51,9 +51,18 @@ structlog>=22.0.0            # Structured logging | 結構化日誌
 
 # Real-time Data Pipeline (Phase 4.2) | 實時數據管道（第四階段第二節）
 websocket-client>=1.5.0      # WebSocket client for real-time data | 實時數據WebSocket客戶端
-aiohttp>=3.8.0               # Async HTTP client | 異步HTTP客戶端  
+aiohttp>=3.8.0               # Async HTTP client | 異步HTTP客戶端
 python-socketio>=5.8.0       # Socket.IO support | Socket.IO支援
 asyncio>=3.4.3               # Async programming support | 異步程式支援
+
+# Web Interface (merged from requirements-web.txt) | 網頁界面（從requirements-web.txt合併）
+fastapi>=0.104.0             # Modern web framework | 現代網頁框架
+uvicorn[standard]>=0.24.0    # ASGI server | ASGI服務器
+websockets>=12.0             # WebSocket support | WebSocket支援
+jinja2>=3.1.0                # Template engine | 模板引擎
+python-multipart>=0.0.6      # Multipart form support | 多部分表單支援
+aiofiles>=23.2.0             # Async file operations | 異步文件操作
+psutil>=5.9.0                # System monitoring | 系統監控
 
 # Optional Advanced Packages (install separately if needed) | 可選高級包（需要時單獨安裝）
 # tensorflow>=2.10.0         # Deep learning framework | 深度學習框架

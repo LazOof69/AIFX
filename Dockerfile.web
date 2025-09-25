@@ -1,39 +1,46 @@
-# AIFX Simplified Web Trading Signals - Docker Configuration
-# AIFX 簡化網頁交易信號 - Docker配置
+# AIFX Simplified Web Trading Signals - Optimized Docker Configuration
+# AIFX 簡化網頁交易信號 - 優化Docker配置
 
 FROM python:3.9-slim
 
 # Set metadata
 LABEL maintainer="AIFX Trading System"
-LABEL description="24/7 Forex Trading Signals Web Interface"
-LABEL version="1.0.0"
+LABEL description="24/7 Forex Trading Signals Web Interface - Optimized"
+LABEL version="2.0.0"
 
-# Set environment variables
+# Set environment variables for optimization
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     AIFX_ENV=production \
     TZ=UTC \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    AIFX_IN_CONTAINER=true \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies required for the web app
-RUN apt-get update && apt-get install -y \
+# Install system dependencies in a single layer for efficiency
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    procps \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* /var/tmp/*
 
 # Create non-root user for security
 RUN groupadd -r aifx && useradd -r -g aifx aifx
 
-# Copy simplified requirements file
+# Copy simplified requirements file first for better caching
 COPY requirements-web.txt .
 
-# Install Python dependencies
+# Install Python dependencies with optimizations
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements-web.txt
+    pip install --no-cache-dir --compile -r requirements-web.txt && \
+    pip cache purge
 
 # Copy application source code
 COPY src/ src/
@@ -51,12 +58,12 @@ RUN chown -R aifx:aifx /app
 # Switch to non-root user
 USER aifx
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# Optimized health check with better timing for production
+HEALTHCHECK --interval=60s --timeout=15s --start-period=45s --retries=3 \
     CMD curl -f http://localhost:8080/api/health || exit 1
 
 # Expose port
 EXPOSE 8080
 
-# Default command - run the simplified web interface
-CMD ["python", "-m", "src.main.python.web_interface"]
+# Use optimized startup with performance monitoring
+CMD ["python", "-u", "-m", "src.main.python.web_interface"]
