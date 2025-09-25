@@ -2,8 +2,14 @@
 # AIFX Ubuntu Server One-Click Deployment Script
 # AIFX Ubuntu 伺服器一鍵部署腳本
 #
-# Usage: curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/AIFX/main/ubuntu-deploy.sh | bash
-# 使用方法: curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/AIFX/main/ubuntu-deploy.sh | bash
+# Supports both regular users with sudo privileges and root users
+# 支持具有 sudo 權限的普通用戶和 root 用戶
+#
+# Usage: curl -fsSL https://raw.githubusercontent.com/LazOof69/AIFX/main/ubuntu-deploy.sh | bash
+# 使用方法: curl -fsSL https://raw.githubusercontent.com/LazOof69/AIFX/main/ubuntu-deploy.sh | bash
+#
+# For root users: Enhanced security mode with automatic Docker group management
+# 對於 root 用戶：增強安全模式配合自動 Docker 群組管理
 
 set -e  # Exit on any error
 
@@ -67,15 +73,25 @@ ${NC}"
     echo ""
 }
 
-# Check if running as root
-check_root() {
+# Check user permissions and setup environment
+check_user_permissions() {
     if [[ $EUID -eq 0 ]]; then
-        print_error "This script should not be run as root for security reasons"
-        print_error "出於安全考慮，此腳本不應以 root 身份運行"
-        print_info "Please run as a regular user with sudo privileges"
-        print_info "請以具有 sudo 權限的普通用戶身份運行"
-        exit 1
+        print_warning "Running as root user - Enhanced security mode enabled"
+        print_warning "以 root 用戶身份運行 - 已啟用增強安全模式"
+        print_info "Root user detected: Docker group management will be adjusted accordingly"
+        print_info "檢測到 root 用戶：Docker 群組管理將相應調整"
+        IS_ROOT=true
+        # Set a default user for Docker operations if needed
+        TARGET_USER=${SUDO_USER:-root}
+        print_info "Target user for Docker operations: $TARGET_USER"
+        print_info "Docker 操作的目標用戶：$TARGET_USER"
+    else
+        print_success "Running as regular user with sudo privileges"
+        print_success "以具有 sudo 權限的普通用戶身份運行"
+        IS_ROOT=false
+        TARGET_USER=$USER
     fi
+    echo ""
 }
 
 # Check system requirements
@@ -162,8 +178,21 @@ install_docker() {
         sudo apt update
         sudo apt install -y docker-ce docker-ce-cli containerd.io
 
-        # Add user to docker group
-        sudo usermod -aG docker $USER
+        # Add user to docker group (adjust for root execution)
+        if [[ "$IS_ROOT" == "true" ]]; then
+            if [[ "$TARGET_USER" != "root" ]]; then
+                sudo usermod -aG docker $TARGET_USER
+                print_info "Added $TARGET_USER to docker group"
+                print_info "已將 $TARGET_USER 添加到 docker 群組"
+            else
+                print_info "Root user detected - Docker group membership not required"
+                print_info "檢測到 root 用戶 - 不需要 Docker 群組成員資格"
+            fi
+        else
+            sudo usermod -aG docker $USER
+            print_info "Added $USER to docker group"
+            print_info "已將 $USER 添加到 docker 群組"
+        fi
 
         # Start and enable Docker
         sudo systemctl start docker
@@ -381,8 +410,16 @@ show_results() {
     echo ""
     echo -e "${BLUE}🛠️  Management Commands | 管理命令:${NC}"
     echo ""
+    # Set correct project path based on user
+    local project_path
+    if [[ "$IS_ROOT" == "true" ]]; then
+        project_path="/root/$PROJECT_DIR"
+    else
+        project_path="$HOME/$PROJECT_DIR"
+    fi
+
     echo -e "${CYAN}  View logs | 查看日誌:${NC}"
-    echo "    cd $HOME/$PROJECT_DIR/cloud-deployment"
+    echo "    cd $project_path/cloud-deployment"
     echo "    docker-compose -f docker-compose.cloud.yml logs -f"
     echo ""
     echo -e "${CYAN}  Stop service | 停止服務:${NC}"
@@ -392,7 +429,7 @@ show_results() {
     echo "    docker-compose -f docker-compose.cloud.yml restart"
     echo ""
     echo -e "${CYAN}  Update service | 更新服務:${NC}"
-    echo "    cd $HOME/$PROJECT_DIR && git pull origin main"
+    echo "    cd $project_path && git pull origin main"
     echo "    cd cloud-deployment && docker-compose -f docker-compose.cloud.yml down"
     echo "    docker-compose -f docker-compose.cloud.yml up -d --build"
     echo ""
@@ -406,11 +443,18 @@ show_results() {
     echo "  3. 檢查日誌確保一切正常運行"
     echo ""
 
-    if ! docker ps &>/dev/null; then
+    if ! docker ps &>/dev/null && [[ "$IS_ROOT" != "true" ]]; then
         echo -e "${RED}⚠️  Important Note | 重要提醒:${NC}"
         echo "  You may need to logout and login again to use docker commands without sudo"
         echo "  您可能需要登出後重新登入才能不使用 sudo 執行 docker 命令"
         echo "  Or run: newgrp docker"
+        echo ""
+    elif [[ "$IS_ROOT" == "true" ]]; then
+        echo -e "${GREEN}✅ Root User Benefits | Root 用戶優勢:${NC}"
+        echo "  Docker commands available immediately without sudo"
+        echo "  Docker 命令可立即使用，無需 sudo"
+        echo "  Enhanced system access and control"
+        echo "  增強的系統訪問和控制權限"
         echo ""
     fi
 }
@@ -434,7 +478,7 @@ main() {
     echo ""
 
     # Run deployment steps
-    check_root
+    check_user_permissions
     check_system_requirements
     update_system
     install_docker

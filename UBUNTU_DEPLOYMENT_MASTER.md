@@ -66,7 +66,20 @@ Replace `YOUR_SERVER_IP` with your actual server IP address.
 - **Memory | 記憶體**: Minimum 2GB RAM (4GB recommended | 建議)
 - **Storage | 儲存空間**: Minimum 10GB free disk space | 最少 10GB 可用磁碟空間
 - **Network | 網路**: Internet connection for downloads | 下載用的網路連接
-- **Permissions | 權限**: Sudo privileges | Sudo 權限
+- **Permissions | 權限**: Sudo privileges OR root access | Sudo 權限或 root 訪問權限
+
+### 👥 **User Support | 用戶支援**
+
+**✅ Regular Users with Sudo**
+- Standard deployment with sudo privilege requirement
+- Docker group membership automatically configured
+- Best practice for shared systems
+
+**✅ Root Users** *(Fully Supported)*
+- Enhanced security mode with automatic permission handling
+- Direct Docker access without group membership requirements
+- Optimal for dedicated servers and VPS environments
+- Advanced system access and control capabilities
 
 ### 🔗 Network Requirements | 網路需求
 

@@ -8,7 +8,11 @@
 - Ubuntu 18.04+ server | Ubuntu 18.04+ 伺服器
 - Minimum 2GB RAM, 10GB disk space | 最少 2GB 記憶體，10GB 磁碟空間
 - Internet connection | 網路連接
-- Sudo privileges | Sudo 權限
+- **Sudo privileges OR root access** | **Sudo 權限或 root 訪問權限**
+
+### 🔑 **User Requirements | 用戶需求**
+- **Regular User**: Must have sudo privileges | **普通用戶**：必須具有 sudo 權限
+- **Root User**: ✅ **FULLY SUPPORTED** with enhanced security mode | **Root 用戶**：✅ **完全支持**配合增強安全模式
 
 ## 🚀 One-Command Deployment | 一鍵部署
 
